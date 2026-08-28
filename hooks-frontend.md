@@ -121,6 +121,58 @@ addAction('wp3dconf/frontend/data/priceUpdated', function({ store }) {
 
 ---
 
+#### `wp3dconf/frontend/layer/enabled` / `wp3dconf/frontend/layer/disabled`
+
+Fire when a layer's enabled state changes (independent of selection/visibility — a disabled layer can't be clicked, e.g. via a Conditional Logic `set_state` action).
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `uid`     | String | UID of the layer |
+| `layer`   | Object | The layer object |
+| `store`   | Object | The Alpine.js store instance |
+
+---
+
+#### `wp3dconf/frontend/layer/shown` / `wp3dconf/frontend/layer/hidden`
+
+Fire when a layer's visibility changes.
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `uid`     | String | UID of the layer |
+| `layer`   | Object | The layer object |
+| `store`   | Object | The Alpine.js store instance |
+
+---
+
+#### `wp3dconf/frontend/group/opened` / `wp3dconf/frontend/group/closed`
+
+Fire when a group/subgroup layer is expanded or collapsed in the controls UI.
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `uid`     | String | UID of the group layer |
+| `layer`   | Object | The layer object |
+| `store`   | Object | The Alpine.js store instance |
+
+---
+
+#### `wp3dconf/frontend/modelLoaded` / `wp3dconf/frontend/afterModelLoaded`
+
+Fire once the 3D model has finished loading in the canvas. `modelLoaded` fires first and is used internally to apply the initial active-layer selection to the canvas; `afterModelLoaded` fires once that's done, so it's the safer hook for addon code that needs the canvas fully settled.
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `store`   | Object | The Alpine.js store instance |
+
+```js
+addAction('wp3dconf/frontend/afterModelLoaded', function({ store }) {
+  console.log('Model ready, active layers applied');
+}, 10);
+```
+
+---
+
 #### `wp3dconf/frontend/canvas/apply`
 
 Fires when a layer change is applied to the 3D canvas. Use this to hook into the rendering pipeline for custom material or mesh logic.
@@ -145,6 +197,26 @@ addAction('wp3dconf/frontend/canvas/apply', function({ uid, layer, targetMeshes,
 
 ## JavaScript Filters
 
+#### `wp3dconf/frontend/price/layer_amounts`
+
+Filters a single active layer's own `{ price, salePrice }` pair before it's added into the running total. Runs once per active layer, before `wp3dconf/frontend/price/layer` (which instead filters the accumulated running total after each layer is folded in). Use this one when you need to change what a specific layer itself is worth; use `price/layer` when you need to adjust the total as a whole.
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `amounts` | Object | `{ price, salePrice }` for this layer, read from its settings |
+| `context` | Object | `{ uid, layer, store }` |
+
+```js
+addFilter('wp3dconf/frontend/price/layer_amounts', function(amounts, { uid, layer, store }) {
+  if (uid === 'my-layer-uid') {
+    amounts.price += 5;
+  }
+  return amounts;
+}, 10);
+```
+
+---
+
 #### `wp3dconf/frontend/price/layer`
 
 Filters the price contribution of an individual layer. Return a modified `total` to override the default price calculation.
@@ -167,6 +239,60 @@ window.addEventListener('wp3dconf/frontend:ready', function() {
     return total;
   }, 10);
 });
+```
+
+---
+
+#### `wp3dconf/frontend/summary/layerCustomData`
+
+Filters the custom data shown for a layer in the summary popup. Return `null` to omit the entry entirely (used by Custom Fields to hide a switch's raw `true` value, since the layer name already says everything).
+
+| Parameter | Type          | Description |
+|-----------|---------------|-------------|
+| `data`    | Object\|null  | The layer's custom data (`store.customData[uid]`), or `null` |
+| `context` | Object        | `{ uid, store }` |
+
+```js
+addFilter('wp3dconf/frontend/summary/layerCustomData', function(data, { uid, store }) {
+  if (!data) return data;
+  return { ...data, extra: 'note' };
+}, 10);
+```
+
+---
+
+#### `wp3dconf/frontend/submit/blocked`
+
+Filters whether the add-to-cart / Get a Quote submission should be blocked. Return `true` to block. Used by Custom Fields to block submission while a required field is empty.
+
+| Parameter | Type    | Description |
+|-----------|---------|-------------|
+| `blocked` | Boolean | Whether submission is currently blocked |
+| `context` | Object  | `{ store, form, context }` — `form` is the form element, `context` is `'cart'` or `'quote'` |
+
+```js
+addFilter('wp3dconf/frontend/submit/blocked', function(blocked, { store, context }) {
+  if (blocked) return blocked; // Don't override an existing block.
+  return myValidationFails(store) ? true : blocked;
+}, 10);
+```
+
+---
+
+#### `wp3dconf/frontend/storeValuesToRetrieveParams`
+
+Filters the request parameters sent when generating a shareable link (the `?key=` flow). Use this to append additional fields to the payload the server stores.
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `params`  | Object | Request params (`action`, `nonce`, `active_layers`, `custom_data`) |
+| `store`   | Object | The Alpine.js store instance |
+
+```js
+addFilter('wp3dconf/frontend/storeValuesToRetrieveParams', function(params, store) {
+  params.my_field = store.myValue;
+  return params;
+}, 10);
 ```
 
 ---
@@ -252,10 +378,12 @@ These actions fire around the rendering of each control element in the frontend 
 | `wp3dconf/frontend/controls/after_group_html` | `$skin` | After a group block is rendered |
 | `wp3dconf/frontend/controls/before_control_item` | `$layer, $skin` | Before a control item wrapper |
 | `wp3dconf/frontend/controls/before_control_item_inner` | `$layer, $skin` | Before a control item inner container |
+| `wp3dconf/frontend/controls/before_layer_html` | `$layer, $skin` | Immediately before the layer-type-specific markup (i.e. before `layer_{type}_html` fires) |
+| `wp3dconf/frontend/controls/layer_{type}_html` | `$layer, $skin` | Inside a control item for a specific layer type. Replace `{type}` with the layer type slug (e.g. `layer_color_html`) |
+| `wp3dconf/frontend/controls/after_layer_html` | `$layer, $skin` | Immediately after the layer-type-specific markup |
 | `wp3dconf/frontend/controls/after_control_item_inner` | `$layer, $skin` | After a control item inner container |
 | `wp3dconf/frontend/controls/before_control_icon` | `$uid, $skin` | Before the control icon element |
 | `wp3dconf/frontend/controls/after_control_icon` | `$uid, $skin` | After the control icon element |
-| `wp3dconf/frontend/controls/layer_{type}_html` | `$layer, $skin` | Inside a control item for a specific layer type. Replace `{type}` with the layer type slug (e.g. `layer_color_html`). |
 
 ```php
 // Add content after a control icon
@@ -267,6 +395,23 @@ add_action( 'wp3dconf/frontend/controls/after_control_icon', function( $uid, $sk
 add_action( 'wp3dconf/frontend/controls/layer_color_html', function( $layer, $skin ) {
   echo '<span class="color-swatch" style="background:' . esc_attr( $layer['value'] ) . '"></span>';
 }, 10, 2 );
+```
+
+### Controls Rendering Filters
+
+These filter the classes and attributes rendered on each control item wrapper.
+
+| Hook | Parameters | Description |
+|------|-----------|-------------|
+| `wp3dconf/frontend/controls/wrapper_classes` | `$classes` | Filters the classes on the outermost controls wrapper element |
+| `wp3dconf/frontend/controls/item_classes` | `$classes` | Filters the classes array (`selector`, `class`, `control_type`, `layer_type`) applied to a single control item |
+| `wp3dconf/frontend/controls/item_attributes` | `$attr, $uid, $skin` | Filters the full HTML-attribute-string array (`class`, `uid`, Alpine bindings) rendered on a control item |
+
+```php
+add_filter( 'wp3dconf/frontend/controls/item_classes', function( $classes ) {
+  $classes['my-addon'] = 'my-addon-class';
+  return $classes;
+} );
 ```
 
 ---

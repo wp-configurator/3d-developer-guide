@@ -97,6 +97,7 @@ add_action( 'wp3dconf/register_skins', function() {
 | Method | Description |
 |--------|-------------|
 | `get_canvas_html()` | The 3D canvas element |
+| `get_toolbar_html()` | The editor-registered toolbar (module icons, e.g. Conditional Logic) |
 | `get_controls_html()` | Full controls tree (groups, subgroups, options) |
 | `get_controls_inner_html( $layers )` | Controls inner container for a specific layer set |
 | `get_controls_item( $layer )` | A single control item |

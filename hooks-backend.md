@@ -160,6 +160,33 @@ addAction('wp3dconf/editor/layer-reordered', function({ store }) {
 
 ---
 
+#### `wp3dconf/editor/configurator-save-failed`
+
+Fires when a save request fails (network error or a rejected response from the server).
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `store`   | Object | The editor Pinia store |
+| `error`   | Mixed  | The error payload returned by the failed request |
+
+```js
+addAction('wp3dconf/editor/configurator-save-failed', function({ store, error }) {
+  console.error('Save failed:', error);
+}, 10);
+```
+
+---
+
+#### `wp3dconf/editor/trigger-save`
+
+The host listens for this action to trigger a save programmatically — it's the mechanism `createHostSaveSync().triggerSave()` from `wp3dconf-module-kit` rides on (see [`extend-modules.md`](extend-modules.md)). You won't normally add a listener to this one yourself; call `doAction` to ask the host to save on your module's behalf.
+
+```js
+window.WP3dConf.doAction('wp3dconf/editor/trigger-save');
+```
+
+---
+
 ## JavaScript Editor Filters
 
 #### `wp3dconf/editor/configurator-data`
@@ -218,83 +245,83 @@ add_action( 'wp3dconf/editor/after_enqueue', function() {
 
 ## PHP Admin Actions
 
-#### `wp3dconf/admin/settings/section`
+#### `wp3dconf/admin/register_post_types`
 
-Fires inside the plugin settings page, allowing addons to register additional settings sections.
+Fires when the plugin registers its post types. Use this to register additional post types alongside `wp3dconf`.
 
 ```php
-add_action( 'wp3dconf/admin/settings/section', function() {
-  ?>
-  <div class="wp3dconf-settings-section">
-    <h2><?php esc_html_e( 'My Addon Settings', 'my-addon' ); ?></h2>
-    <table class="form-table">
-      <tr>
-        <th><?php esc_html_e( 'My Option', 'my-addon' ); ?></th>
-        <td>
-          <input type="text" name="my_addon_option"
-            value="<?php echo esc_attr( get_option( 'my_addon_option' ) ); ?>">
-        </td>
-      </tr>
-    </table>
-  </div>
-  <?php
+add_action( 'wp3dconf/admin/register_post_types', function() {
+  register_post_type( 'my_addon_type', array( /* ... */ ) );
 } );
 ```
 
 ---
 
-#### `wp3dconf/admin/settings/save`
+#### `wp3dconf/admin/register_submenus`
 
-Fires when the plugin settings form is submitted. Use this to save additional addon settings.
+Fires while the plugin registers its wp-admin submenu pages (under `edit.php?post_type=wp3dconf`). Use this to add your own submenu page.
 
 ```php
-add_action( 'wp3dconf/admin/settings/save', function() {
-  if ( isset( $_POST['my_addon_option'] ) ) {
-    update_option( 'my_addon_option', sanitize_text_field( wp_unslash( $_POST['my_addon_option'] ) ) );
-  }
+add_action( 'wp3dconf/admin/register_submenus', function() {
+  add_submenu_page(
+    'edit.php?post_type=wp3dconf',
+    __( 'My Addon', 'my-addon' ),
+    __( 'My Addon', 'my-addon' ),
+    'manage_options',
+    'my-addon-page',
+    'my_addon_render_page'
+  );
 } );
-```
-
----
-
-#### `wp3dconf/admin/configurator/metabox`
-
-Fires inside the configurator edit screen, below the main editor. Use this to add a custom metabox or additional UI.
-
-| Parameter  | Type | Description |
-|------------|------|-------------|
-| `$post_id` | int  | The configurator post ID |
-
-```php
-add_action( 'wp3dconf/admin/configurator/metabox', function( $post_id ) {
-  ?>
-  <div class="postbox">
-    <h2><?php esc_html_e( 'My Addon', 'my-addon' ); ?></h2>
-    <div class="inside">
-      <!-- Custom metabox content -->
-    </div>
-  </div>
-  <?php
-}, 10, 1 );
 ```
 
 ---
 
 ## PHP Admin Filters
 
-#### `wp3dconf/admin/configurator/tabs`
+> If you're building a module rather than a standalone addon, prefer overriding
+> `layer_settings_controls()`, `layer_types()`, `global_settings_controls()`,
+> or `toolbar_icon()` on your `Module_Base` subclass instead of hooking these
+> filters directly — see [`extend-modules.md`](extend-modules.md). They exist
+> as plain WordPress filters too because `Module_Base` itself is built on top
+> of them.
 
-Filters the tab list in the configurator editor sidebar. Use this to add custom tabs.
+#### `wp3dconf/admin/settings_fields`
+
+Filters the tab/field definitions on the **wp3dconf → Settings** page. Unlike a typical settings-page hook, this isn't an action that echoes HTML — it's a filter over the same array-based field schema the core settings themselves are defined with, keyed by tab label.
 
 | Parameter | Type  | Description |
 |-----------|-------|-------------|
-| `$tabs`   | Array | Registered tabs keyed by tab ID |
+| `$fields` | Array | Tab label => list of field definitions |
 
 ```php
-add_filter( 'wp3dconf/admin/configurator/tabs', function( $tabs ) {
+add_filter( 'wp3dconf/admin/settings_fields', function( $fields ) {
+  $fields[ __( 'My Addon', 'my-addon' ) ] = array(
+    array(
+      'id'      => 'my_addon_option',
+      'label'   => __( 'My Option', 'my-addon' ),
+      'type'    => 'text',
+      'default' => '',
+    ),
+  );
+  return $fields;
+} );
+```
+
+---
+
+#### `wp3dconf/editor/tabs`
+
+Filters the tab list in the configurator editor sidebar (default tabs: `model_structure`, `global_settings`).
+
+| Parameter | Type  | Description |
+|-----------|-------|-------------|
+| `$tabs`   | Array | Registered tabs keyed by tab ID, each `['name' => ..., 'icon' => ...]` |
+
+```php
+add_filter( 'wp3dconf/editor/tabs', function( $tabs ) {
   $tabs['my-tab'] = array(
-    'label' => __( 'My Tab', 'my-addon' ),
-    'icon'  => 'dashicons-admin-generic',
+    'name' => __( 'My Tab', 'my-addon' ),
+    'icon' => 'settings',
   );
   return $tabs;
 } );
@@ -302,19 +329,55 @@ add_filter( 'wp3dconf/admin/configurator/tabs', function( $tabs ) {
 
 ---
 
-#### `wp3dconf/admin/layer/types`
+#### `wp3dconf/editor/layer_types`
 
-Filters the available layer types. Use this to register a custom layer type.
+Filters the available layer types shown in the "Model Structure" tab's draggable layer list (default types: `group`, `subgroup`, `option`). This is what `Module_Base::layer_type()` / `layer_types()` writes into on a module's behalf.
 
 | Parameter | Type  | Description |
 |-----------|-------|-------------|
-| `$types`  | Array | Registered layer types keyed by type slug |
+| `$types`  | Array | Registered layer types keyed by type slug, each `['name' => ..., 'icon' => ...]` |
 
 ```php
-add_filter( 'wp3dconf/admin/layer/types', function( $types ) {
+add_filter( 'wp3dconf/editor/layer_types', function( $types ) {
   $types['my-type'] = array(
-    'label' => __( 'My Layer Type', 'my-addon' ),
+    'name' => __( 'My Layer Type', 'my-addon' ),
+    'icon' => 'edit',
   );
   return $types;
+} );
+```
+
+---
+
+#### `wp3dconf/editor/global_settings_controls`
+
+Filters the editor's global-settings schema (the "Global Settings" tab). This is what `Module_Base::global_settings_controls()` writes into on a module's behalf — see `modules/woocommerce/class-woocommerce.php` for a worked example of adding an option to an existing control vs. a whole new section.
+
+| Parameter  | Type  | Description |
+|------------|-------|-------------|
+| `$settings`| Array | Settings schema, keyed by section |
+
+---
+
+#### `wp3dconf/editor/layer_settings_controls`
+
+Filters the schema for the per-layer "Settings" panel shown when a layer is selected in the editor (price, sale price, description, CSS class, etc. live here by default). This is what `Module_Base::layer_settings_controls()` writes into on a module's behalf — see `modules/custom-fields/class-custom-fields.php`'s `layer_settings_controls()` for an example that adds a whole new "Field Settings" section, gated to only show for its own layer types.
+
+| Parameter  | Type  | Description |
+|------------|-------|-------------|
+| `$settings`| Array | Settings schema, keyed by section |
+
+```php
+add_filter( 'wp3dconf/editor/layer_settings_controls', function( $settings ) {
+  $settings['my_section'] = array(
+    'name'     => __( 'My Settings', 'my-addon' ),
+    'settings' => array(
+      'my_option' => array(
+        'name' => __( 'My Option', 'my-addon' ),
+        'type' => 'text',
+      ),
+    ),
+  );
+  return $settings;
 } );
 ```
