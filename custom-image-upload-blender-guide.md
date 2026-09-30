@@ -116,8 +116,6 @@ Test with a checkerboard or UV-grid texture in the sticker slot:
 
 ## Reference screenshots
 
-*(Attach Rodrigo's four screenshots here.)*
-
 - **Left, UV layout:** the checkerboard square is the uploaded image. Only what sits inside that
   square is shown on the jersey.
 - **Right, model:** green marks the canvas/margins on the jersey. This is the area the image is
