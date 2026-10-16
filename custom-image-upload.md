@@ -4,6 +4,8 @@
 plugins.
 **Not for:** shop owners (plugin settings) or 3D artists (see
 [custom-image-upload-blender-guide.md](custom-image-upload-blender-guide.md)).
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
 
 Read [extend-modules.md](extend-modules.md) first for the general module contract. This guide covers
 only what is specific to this module and where you can hook into it.

@@ -1,5 +1,10 @@
 # Custom Fields
 
+**Audience:** developers extending or integrating the Custom Fields module.
+**Not for:** shop owners learning the field settings in the editor.
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
+
 The Custom Fields module adds layer types that ask the customer for a value — engraving text, a note, a name, a choice from a list — rather than just letting them pick between pre-built visual options. A field's value rides through the same `customData[ uid ]` pipeline every other layer already uses, so it shows up in the summary, the quote/cart submission, the PDF invoice and the shareable link for free. This module adds **no storage of its own** and nothing to import/export: a field is a layer, and its configuration is layer settings.
 
 ---

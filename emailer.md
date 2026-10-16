@@ -1,5 +1,10 @@
 # Emailer
 
+**Audience:** developers sending or scheduling email through the plugin's queued emailer.
+**Not for:** shop owners (email settings).
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
+
 The plugin includes a queued email system accessible via `wp3dconf()->emailer`. Emails can be sent immediately or scheduled for future delivery, with automatic exponential-backoff retry logic and a daily cron fallback for permanently failed emails.
 
 ---

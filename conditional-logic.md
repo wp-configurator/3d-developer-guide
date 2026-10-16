@@ -1,5 +1,10 @@
 # Conditional Logic
 
+**Audience:** developers extending or integrating the Conditional Logic module, and anyone tracing how a rule is evaluated.
+**Not for:** shop owners learning the rule builder in the editor.
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
+
 The Conditional Logic module lets a configurator react to the customer's own choices — show or hide a group when an option is picked, apply a discount once a total crosses a threshold, disable a layer until another one is selected. It's a self-contained module (`modules/conditional-logic/`) built entirely on the `Module_Base` contract described in [`extend-modules.md`](extend-modules.md) — it's actually that document's own worked reference implementation, so this page focuses on what the module *does* rather than how modules are wired in general.
 
 ---

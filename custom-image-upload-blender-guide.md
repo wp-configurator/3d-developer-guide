@@ -2,6 +2,8 @@
 
 **Audience:** 3D artists preparing a GLB for the Custom Image Upload layer.
 **Not for:** shop owners. This covers the model, not the plugin settings.
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
 
 Custom Image Upload puts a shopper's image onto a **target mesh**. The plugin does not project
 the image onto your model. It swaps the texture on a mesh you supply, so the mesh has to be built

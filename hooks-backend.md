@@ -1,5 +1,10 @@
 # Backend Hooks & Filters
 
+**Audience:** developers hooking into the admin and configurator editor.
+**Not for:** shop owners or 3D artists.
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
+
 Actions and filters available in the WordPress admin - covering the configurator editor and general admin/settings areas.
 
 ---

@@ -1,5 +1,10 @@
 # Troubleshooting
 
+**Audience:** developers debugging the plugin with its JavaScript and PHP loggers.
+**Not for:** shop owners looking for settings help.
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
+
 WP 3D Configurator provides logging tools on both the JavaScript and PHP sides to help you debug issues during development.
 
 ---

@@ -1,5 +1,10 @@
 # Creating a New Module
 
+**Audience:** developers building a new module or an add-on that registers one.
+**Not for:** shop owners or 3D artists.
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
+
 This document is the full process for adding a new feature module to
 wp-3d-configurator, backend (PHP) and frontend (Vue/TS) together. Follow it
 top to bottom for a new module; skip the parts a given module doesn't need

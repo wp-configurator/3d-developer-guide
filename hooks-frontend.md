@@ -1,5 +1,10 @@
 # Frontend Hooks & Filters
 
+**Audience:** developers hooking into the customer-facing configurator, in JavaScript and PHP.
+**Not for:** shop owners or 3D artists.
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
+
 Actions and filters available on the customer-facing configurator page - both JavaScript (Alpine.js) and PHP.
 
 ---

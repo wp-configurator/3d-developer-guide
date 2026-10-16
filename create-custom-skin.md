@@ -1,5 +1,10 @@
 # Creating a Custom Skin
 
+**Audience:** developers and theme authors building a custom frontend skin.
+**Not for:** shop owners (plugin settings) or 3D artists.
+**Applies to:** plugin v1.3.5
+**Last updated:** 2026-10-16
+
 Skins control how the configurator is rendered on the frontend — the layout, the controls structure, the canvas placement, and any surrounding UI. The plugin ships with two built-in skins (`default` and `accordion`). You can create your own by extending `Skin_Base` and registering it via the `wp3dconf/register_skins` hook.
 
 ---
