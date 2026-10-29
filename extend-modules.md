@@ -110,10 +110,8 @@ two ways to do that - pick one.
 
 ```php
 private static $module_files = array(
-	'get-a-quote'    => '/get-a-quote/class-get-a-quote.php',
-	'contact-form-7' => '/contact-form-7/class-contact-form-7.php',
-	'woocommerce'    => '/woocommerce/class-woocommerce.php',
-	'my-module'      => '/my-module/class-my-module.php',
+	'woocommerce' => '/woocommerce/class-woocommerce.php',
+	'my-module'   => '/my-module/class-my-module.php',
 );
 ```
 

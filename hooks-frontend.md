@@ -269,10 +269,8 @@ Filters the price contribution of an individual layer. Return a modified `total`
 
 | Parameter | Type   | Description |
 |-----------|--------|-------------|
-| `total`   | Number | The current price total for this layer |
-| `uid`     | String | UID of the layer |
-| `layer`   | Object | The layer object |
-| `store`   | Object | The Alpine.js store instance |
+| `total`   | Number | The running total, including this layer |
+| `context` | Object | `{ uid, layer, store }` |
 
 ```js
 window.addEventListener('wp3dconf/frontend:ready', function() {
