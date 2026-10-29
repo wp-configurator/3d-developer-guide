@@ -3,7 +3,7 @@
 **Audience:** developers hooking into the admin and configurator editor.
 **Not for:** shop owners or 3D artists.
 **Applies to:** plugin v1.3.5
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-29
 
 Actions and filters available in the WordPress admin - covering the configurator editor and general admin/settings areas.
 
@@ -386,3 +386,36 @@ add_filter( 'wp3dconf/editor/layer_settings_controls', function( $settings ) {
   return $settings;
 } );
 ```
+
+**Schema keys added in 1.3.5:**
+
+| Key | On | Effect |
+|-----|----|--------|
+| `sections` | a settings group | Titled subgroups: `'<key>' => array( 'name' => …, 'desc' => …, 'layout' => 'inline'\|'columns', 'conditions' => … )`. Presentational only; an empty `name` draws no title. |
+| `section` | a setting | The section it belongs to |
+| `decimals` | a setting with `'input_type' => 'number'` | Decimal places its box accepts; whole numbers only without it |
+
+```php
+'my_width' => array(
+	'name'       => __( 'Width', 'my-addon' ),
+	'type'       => 'text',
+	'input_type' => 'number',
+	'decimals'   => 2,
+	'section'    => 'size',
+),
+```
+
+The control types `formula`, `range_preview` and `range_tiers` belong to the Formula and Range layers and aren't meant for other settings.
+
+---
+
+#### `wp3dconf/data/sanitize_layer_setting`
+
+Filters one layer setting as an editor save stores it, after the generic sanitizer — for a setting the text sanitizer would damage. Formula uses it to keep `<`, `>` and `%` in an expression. Settings written any other way (import, duplicate, `update_post_meta()`) go through WordPress's `sanitize_post_meta__wp3dconf_layer_settings`. *(1.3.5)*
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `$clean`  | mixed  | Value after the generic sanitizer |
+| `$value`  | mixed  | Raw value, unslashed but not sanitized |
+| `$key`    | string | Setting key |
+| `$uid`    | string | Layer uid |
