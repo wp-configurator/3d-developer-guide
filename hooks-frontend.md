@@ -3,7 +3,7 @@
 **Audience:** developers hooking into the customer-facing configurator, in JavaScript and PHP.
 **Not for:** shop owners or 3D artists.
 **Applies to:** plugin v1.3.5
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-29
 
 Actions and filters available on the customer-facing configurator page - both JavaScript (Alpine.js) and PHP.
 
@@ -42,6 +42,8 @@ A utilities object is also available via `window.WP3dConfUtils`.
 ```js
 const { log } = window.WP3dConfUtils;
 ```
+
+`WP3dConfUtils.formatPriceRaw( price )` formats money as plain text, for control items where `wp_kses()` allows `x-text` but not `x-html`. `store.getUnavailableLayers()` returns the uids hidden or disabled right now. *(1.3.5)*
 
 ### `addAction( hook, callback, priority )`
 
@@ -114,15 +116,39 @@ Fires when a layer option is deactivated.
 
 Fires whenever the calculated price is updated.
 
-| Parameter | Type   | Description |
-|-----------|--------|-------------|
-| `store`   | Object | The Alpine.js store instance |
+| Parameter      | Type   | Description |
+|----------------|--------|-------------|
+| `store`        | Object | The Alpine.js store instance |
+| `regularPrice` | Number | The total before sale prices |
+| `total`        | Number | The total the customer pays |
 
 ```js
 addAction('wp3dconf/frontend/data/priceUpdated', function({ store }) {
   console.log('Updated price:', store.price);
 }, 10);
 ```
+
+---
+
+#### `wp3dconf/frontend/data/ready`
+
+Fires once, after defaults are filled in and the first total is worked out. Use it instead of `data/initialized` for anything that reads values or prices. *(1.3.5)*
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `store`   | Object | The Alpine.js store instance |
+
+---
+
+#### `wp3dconf/frontend/layer/customDataUpdated`
+
+Fires when a selected layer's data changes — a Range moved, a text field edited, `store.updateCustomData()` called — after the price is recalculated. A layer's first value fires `layer/activated` instead. *(1.3.5)*
+
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| `uid`     | String | UID of the layer |
+| `layer`   | Object | The layer object |
+| `store`   | Object | The Alpine.js store instance |
 
 ---
 
@@ -159,6 +185,17 @@ Fire when a group/subgroup layer is expanded or collapsed in the controls UI.
 | `uid`     | String | UID of the group layer |
 | `layer`   | Object | The layer object |
 | `store`   | Object | The Alpine.js store instance |
+
+---
+
+#### `wp3dconf/frontend/user/group_toggled` / `wp3dconf/frontend/user/option_clicked`
+
+Fire only for a shopper's own clicks — not for initial state, Conditional Logic actions or field edits. Used by [Model Animation](model-animation.md). *(1.3.5)*
+
+| Hook | Payload |
+|------|---------|
+| `user/group_toggled` | `{ uid, opened, store }` |
+| `user/option_clicked` | `{ uid, store }` |
 
 ---
 
@@ -220,6 +257,10 @@ addFilter('wp3dconf/frontend/price/layer_amounts', function(amounts, { uid, laye
 }, 10);
 ```
 
+`store.getLayerAmounts( uid )` reads a layer's `{ price, salePrice }`, mid-pass included. Custom Fields, Range and Formula price their layers here at priority 10, so register higher to adjust them. *(1.3.5)*
+
+> **Mirror every change in PHP** with `wp3dconf/data/manipulate_layer_price`. The live total is only shown; the cart, quote and PDF are priced on the server.
+
 ---
 
 #### `wp3dconf/frontend/price/layer`
@@ -228,10 +269,8 @@ Filters the price contribution of an individual layer. Return a modified `total`
 
 | Parameter | Type   | Description |
 |-----------|--------|-------------|
-| `total`   | Number | The current price total for this layer |
-| `uid`     | String | UID of the layer |
-| `layer`   | Object | The layer object |
-| `store`   | Object | The Alpine.js store instance |
+| `total`   | Number | The running total, including this layer |
+| `context` | Object | `{ uid, layer, store }` |
 
 ```js
 window.addEventListener('wp3dconf/frontend:ready', function() {
@@ -418,6 +457,38 @@ add_filter( 'wp3dconf/frontend/controls/item_classes', function( $classes ) {
   return $classes;
 } );
 ```
+
+---
+
+## PHP Filters – Summary & Pricing
+
+Every server-side figure — cart, checkout, orders, Get a Quote, Contact Form 7, the PDF — comes from `Configurator_Utils::get_summary_data()`, which recomputes prices from the posted selection. These filters fire for **every** layer: return the incoming value untouched for layers that aren't yours.
+
+| Filter | Arguments | Use it to |
+|--------|-----------|-----------|
+| `wp3dconf/data/summary_uids` *(1.3.5)* | `$uids`, `$data`, `$custom_data` | Add a uid that must always be counted, such as a layer that prices itself from other layers |
+| `wp3dconf/data/active_layers` *(1.3.5)* | `$active_layers`, `$data` | Change the parent → children map stored with a cart item or quote, which its printed rows come from |
+| `wp3dconf/data/custom_data_layer_price` | `$price`, `$layer`, `$field_data` (this layer's custom data), `$data` | Price a layer that stores a value. Core returns 0 for any layer with custom data. |
+| `wp3dconf/data/manipulate_layer_price` | `$price`, `$layer`, `$data`, `$custom_data`, `$summary_uids` *(1.3.5)* | Have the last word on a layer's `price` / `sale_price` pair |
+| `wp3dconf/data/custom_data_string` | `$string`, `$uid`, `$custom_data`, `$data`, `$summary_uids` *(1.3.5)* | Change the text in brackets after a layer's name, e.g. `Width (1200 mm)`. Escaped when printed. |
+| `wp3dconf/data/custom_data_html` | `$html`, `$uid`, `$item`, `$summary_data` | Append HTML after a layer's row. **Escape it yourself** — it reaches emails and the PDF. |
+| `wp3dconf/data/sanitize_custom_data_value` | `$clean`, `$value`, `$key`, `$uid` | Coerce a posted custom-data value after the generic sanitizer |
+
+`$data` is the configurator's `Data_Repository`; `$custom_data` is every layer's custom data, keyed by uid. The total counts a sale price only when `0 < sale < regular` (`Utils::has_sale_price()`, `Utils::effective_price()`).
+
+```php
+add_filter( 'wp3dconf/data/manipulate_layer_price', function ( $price, $layer ) {
+	if ( 'my-type' !== ( $layer['type'] ?? '' ) ) {
+		return $price;
+	}
+
+	$price['price'] = round( (float) $price['price'] * 1.1, \WP3DCONF\Utils::get_price_decimals() );
+
+	return $price;
+}, 20, 2 );
+```
+
+Make the same change in JS with `wp3dconf/frontend/price/layer_amounts`.
 
 ---
 

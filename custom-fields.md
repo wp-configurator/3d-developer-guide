@@ -3,7 +3,7 @@
 **Audience:** developers extending or integrating the Custom Fields module.
 **Not for:** shop owners learning the field settings in the editor.
 **Applies to:** plugin v1.3.5
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-29
 
 The Custom Fields module adds layer types that ask the customer for a value — engraving text, a note, a name, a choice from a list — rather than just letting them pick between pre-built visual options. A field's value rides through the same `customData[ uid ]` pipeline every other layer already uses, so it shows up in the summary, the quote/cart submission, the PDF invoice and the shareable link for free. This module adds **no storage of its own** and nothing to import/export: a field is a layer, and its configuration is layer settings.
 
@@ -18,7 +18,7 @@ The Custom Fields module adds layer types that ask the customer for a value — 
 | Frontend runtime (hand-authored, not built) | `modules/custom-fields/assets/frontend/custom-fields.js` |
 | Templates | `templates/layer/layer-field.php` (shared wrapper) + `templates/layer/layer-<type>.php` (one per type) |
 
-Unlike Conditional Logic, this module ships **no editor bundle** — there's no `assets/editor/` directory. Its six layer types are registered into the *existing* "Model Structure" layer list and its own settings section into the *existing* layer-settings panel, both via plain schema arrays (`layer_types()` / `layer_settings_controls()` on `Module_Base`) rather than custom Vue UI. See [`extend-modules.md`](extend-modules.md) for what each of those overrides does.
+Unlike Conditional Logic, this module ships **no editor bundle** — there's no `assets/editor/` directory. Its seven layer types are registered into the *existing* "Model Structure" layer list and its own settings section into the *existing* layer-settings panel, both via plain schema arrays (`layer_types()` / `layer_settings_controls()` on `Module_Base`) rather than custom Vue UI. See [`extend-modules.md`](extend-modules.md) for what each of those overrides does.
 
 The frontend script is also notable for *not* being a Vite build output: `Module_Base::enqueue_frontend_assets()` falls back to `<slug>.js` when a module ships no built `<slug>.min.js`, and this module deliberately uses that fallback (see the file's own header comment).
 
@@ -36,12 +36,13 @@ Defined in `Fields::get_types()`, in the order they appear in the editor's add-l
 | `radio` | Radio | single string | Row of choices (`has_options`) |
 | `checkbox` | Checkbox | string[] | Row of choices (`has_options`), the only type whose value is a list (`multiple`) |
 | `switch` | Switch | boolean | Stores `true` and nothing else (`boolean`) — turning it off deactivates the layer entirely rather than storing `false` |
+| `range` | Range | number | A number on a scale — slider, number box or both (`numeric`). Snapped onto the scale, priced per unit or by tier, and always selected. See [range.md](range.md). |
 
 Every value is written under the same fixed key, `Fields::VALUE_KEY` (`'value'`) — `store.customData[uid].value` — regardless of type, so consumers (Conditional Logic's `field_value` / `text_length` rules, for instance) can read a field without knowing which type produced it.
 
 ### Capability flags, not a type switch
 
-Settings and frontend behaviour are gated on **capability flags** on each type's definition (`placeholder`, `text_entry`, `multiline`, `has_options`, `multiple`, `boolean`) rather than on a hardcoded list of slugs. `Fields::get_slugs_with( $capability )` and its named wrappers (`get_option_slugs()`, `get_multiline_slugs()`, `get_boolean_slugs()`, `get_text_entry_slugs()`) derive everything from those flags. This is deliberate: a future field type inherits the right editor controls and frontend handling automatically just by declaring the same flags — nothing else needs to change to add, say, a `date` type that behaves like a text field.
+Settings and frontend behaviour are gated on **capability flags** on each type's definition (`placeholder`, `text_entry`, `multiline`, `has_options`, `multiple`, `boolean`, `numeric`) rather than on a hardcoded list of slugs. `Fields::get_slugs_with( $capability )` and its named wrappers (`get_option_slugs()`, `get_multiline_slugs()`, `get_boolean_slugs()`, `get_text_entry_slugs()`, `get_numeric_slugs()`) derive everything from those flags, and `Fields::is_numeric_type( $type )` tests one layer. This is deliberate: a future field type inherits the right editor controls and frontend handling automatically just by declaring the same flags — nothing else needs to change to add, say, a `date` type that behaves like a text field.
 
 ### Adding a field type
 
@@ -61,11 +62,12 @@ Nothing in `Custom_Fields` (the module bootstrap class) needs to change — `ren
 |---------|-----------|
 | `field_options` | Types with `has_options` (select, radio, checkbox) |
 | `field_placeholder` | Types with `placeholder` |
-| `field_default` | Types with `text_entry` (choice types mark defaults on the choices themselves instead) |
+| `field_default` | Types with `text_entry` or `numeric` (choice types mark defaults on the choices themselves instead) |
 | `field_maxlength` | Types with `text_entry` |
 | `field_checked` | Types with `boolean` (switch) |
 | `field_rows` | Types with `multiline` (default: 4) |
-| `field_required` | Every field type |
+| `field_required` | Every field type except `numeric` ones — a Range always holds a value |
+| `range_*` | Types with `numeric` — the scale, input style, unit and price tiers. See [range.md](range.md). |
 
 Price, sale price, label and CSS class aren't repeated here — the core layer-settings controls already apply to any non-group layer.
 
@@ -85,7 +87,7 @@ store.handleFieldToggle(uid, value, checked); // one checkbox row toggling on/of
 
 Debouncing is per-uid (`debounceByKey`), so typing in one field never resets another field's pending commit. Only types in `typedTypes` (i.e. `text_entry`) are debounced at all — a dropdown or radio commits the instant it changes, since waiting 300ms to reprice a discrete choice just looks broken.
 
-An **empty** commit — an empty string, empty list, or an off switch — deactivates the layer via `store.deactivateLayer()`. A non-empty commit on an inactive layer calls `store.activateLayer()` directly rather than `store.handleOptionClick()`, because that helper deselects sibling options on a single-select group — which typing into a field must never trigger.
+An **empty** commit — an empty string, empty list, or an off switch — deactivates the layer via `store.deactivateLayer()`. A Range never deactivates; its commits are snapped onto its scale (see [range.md](range.md)). A commit to a layer that is already active fires `wp3dconf/frontend/layer/customDataUpdated`. A non-empty commit on an inactive layer calls `store.activateLayer()` directly rather than `store.handleOptionClick()`, because that helper deselects sibling options on a single-select group — which typing into a field must never trigger.
 
 ### Defaults on load
 
@@ -93,6 +95,7 @@ An **empty** commit — an empty string, empty list, or an off switch — deacti
 
 - `switch` — activates if `field_checked` is set.
 - Choice types — activates whichever options are marked `selected` in `field_options` (first one only, for non-`multiple` types).
+- `range` — always activates, with `field_default` (or the minimum) snapped onto the scale.
 - Everything else — activates with `field_default` if non-empty.
 
 ### Hooks it uses
@@ -118,7 +121,9 @@ The frontend blocks submission client-side, but two server-side gates exist for 
 | Get a Quote | `wp3dconf/quote/validation_errors` | `validate_required_fields()` — adds a `WP_Error` |
 | WooCommerce cart | `woocommerce_add_to_cart_validation` | `validate_cart_required_fields()` — calls `wc_add_notice()` and returns `false` |
 
-Both funnel into `missing_required_fields()` → the static, DB-free `missing_from_layers( $layers, $custom_data )`, which is the actual decision logic, kept separate from the WordPress/WooCommerce plumbing around it so it can be reasoned about (and tested) without a database.
+Both funnel into `missing_required_fields()` → the static, DB-free `missing_from_layers( $layers, $custom_data, $unavailable )`, which is the actual decision logic, kept separate from the WordPress/WooCommerce plumbing around it so it can be reasoned about (and tested) without a database.
+
+`$unavailable` lists the layers hidden or disabled when the form was sent: the forms post `store.getUnavailableLayers()` as `wp3dconf-unavailable-layers`, read back by `Configurator_Utils::unavailable_layers()`. A required field that Conditional Logic hid therefore doesn't block the order on the server either. The list only relaxes the required check; it never changes a price.
 
 The "you missed one" message itself is printed by `render_required_notice()`, hooked on `wp3dconf/frontend/form/hidden_fields` — it's placed there (inside the form, alongside the hidden fields) rather than beside the field itself, because the field can be behind the summary/form overlay when the customer tries to submit.
 
@@ -160,6 +165,6 @@ Control-item HTML is escaped with `Utils::allowed_tags()`, which by default stri
 
 ## Extending
 
-**A field's value in Conditional Logic:** because every field type writes to the same `customData[uid].value` key, Conditional Logic's `field_value` and `text_length` logic rule types (see [`conditional-logic.md`](conditional-logic.md)) work against any custom field automatically — there's nothing field-type-specific to wire up on that side.
+**A field's value in Conditional Logic:** because every field type writes to the same `customData[uid].value` key, Conditional Logic's `field_value` rule (see [`conditional-logic.md`](conditional-logic.md)) works against any custom field automatically — there's nothing field-type-specific to wire up on that side. (`text_length` is defined but not yet wired.)
 
 **Reading a field's value from your own addon:** `store.customData[uid].value` on the frontend; `$data->get_custom_data()[$uid][Fields::VALUE_KEY]` (or the `$custom_data` array already passed into most `Data_Repository`-adjacent filters) on the PHP side. Use `Fields::is_field_type( $layer['type'] )` to check whether a given layer is one of this module's types before assuming the shape.
