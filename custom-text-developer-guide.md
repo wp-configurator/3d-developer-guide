@@ -4,7 +4,7 @@
 **Not for:** shop owners (see [custom-text.md](custom-text.md)) or 3D artists (see
 [custom-text-blender-guide.md](custom-text-blender-guide.md)).
 **Applies to:** plugin v1.3.6
-**Last updated:** 2026-10-30
+**Last updated:** 2026-11-04
 
 Read [extend-modules.md](extend-modules.md) first for the general module contract. This guide covers
 only what is specific to this module and where you can hook into it. For a comparable module, see
@@ -44,18 +44,27 @@ keystroke --> normalizeText() --150ms debounce--> render 1024px canvas
 ```
 modules/custom-text/
 ├── class-custom-text.php        # Module_Base subclass: layer type, settings, fonts, cleaning, price, validation
-├── google-fonts.php             # Family names offered in the Fonts setting
-└── assets/frontend/
-    ├── custom-text.css
-    └── js/                      # unbundled native ES modules (no build step)
+├── class-font-library.php       # Storage for every font and its weights (Google and custom)
+├── class-google-fonts.php       # Downloads Google font files (one css2 request, then each woff2)
+├── class-fonts-page.php         # The admin "Fonts" page: menu, forms, handlers
+├── google-fonts.php             # family => variant keys Google offers (generated, see 4.3)
+└── assets/
+    ├── admin/                   # Fonts page script and CSS (plain files, no build)
+    │   ├── fonts-page.js
+    │   └── fonts-page.css
+    └── frontend/
+        ├── custom-text.css
+        └── js/                  # unbundled native ES modules (no build step)
 templates/
 ├── layer/layer-custom-text.php  # per-layer text field and Customize button
 └── custom-text-popup.php        # the shared Customize popup, printed once per configurator
 ```
 
 **There is no Vite build for this module.** The JS is hand-authored and served as-is, so edit files
-under `assets/frontend/js/` and reload. There is no editor bundle either: the layer's settings come
-from PHP (`layer_settings_controls()`).
+under `assets/frontend/js/` and reload. The Fonts page script (`assets/admin/fonts-page.js`) is also
+plain. There is no editor bundle either: the layer's settings come from PHP
+(`layer_settings_controls()`). The only editor-side pieces are the `optgroup`, `filter` and
+`filter_placeholder` setting flags, which the shared `TheSelect.vue` handles (see 4.4).
 
 ### JS modules (one concern each)
 
@@ -108,7 +117,7 @@ Stored in `_wp3dconf_layer_settings` under the layer's `uid`. The frontend reads
 | `custom_text_max_length` | int | `30` | 1-100; `0`/empty means 30 |
 | `custom_text_letter_case` | `none` \| `uppercase` \| `lowercase` | `none` | |
 | `custom_text_color` | hex | `#000000` | Starting text colour |
-| `custom_text_fonts` | `string[]` | `[]` | Families from `font_list()` |
+| `custom_text_fonts` | `string[]` | `[]` | Families in the font library (`Font_Library::families()`). Layers saved before 1.3.6 may also hold Google families from `font_list()` that were never added to the library |
 | `custom_text_default_font` | string | `''` | Must also be in `custom_text_fonts` |
 | `custom_text_curve` | number | `0` | -100 to 100 |
 | `custom_text_letter_spacing` | number | `0` | -10 to 50 |
@@ -169,7 +178,7 @@ shoppers cannot change the colour until an admin enables it.
 | Global | Content |
 |---|---|
 | `window.WP3dConf.customText.i18n` | Translated strings (from `frontend_payload()`) |
-| `window.WP3dConf.customText.fonts` | `{ [family]: url }` for every downloaded font a layer offers |
+| `window.WP3dConf.customText.fonts` | `{ [family]: url }` for every font a layer offers. One URL per family: the family's default variant (`Font_Library::default_variant()`), which is Regular, else the lightest |
 | `window.WP3dConf.viewer` | The three.js viewer (`swapTexture`, `resetTexture`, `findMeshes`) |
 | `window.WP3dConf.layers` | Layer settings, `.nonce`, `.ajaxUrl`, `.postId` |
 
@@ -193,6 +202,132 @@ is the figure they pay.
 
 These are `public static`, so you can call them from your own code. They are not part of the
 `Module_Base` contract, but treat their signatures as stable.
+
+### 4.1 The font library
+
+`Font_Library` stores every font the module can offer, whatever its source. Nothing else writes font
+files.
+
+Option `wp3dconf_fonts` (not autoloaded):
+
+```php
+array(
+	'Open Sans' => array(
+		'source'   => 'google',               // 'google' or 'custom'
+		'variants' => array(
+			'400'  => array( 'weight' => 400, 'style' => 'normal', 'file' => 'google/open-sans-400.woff2' ),
+			'700i' => array( 'weight' => 700, 'style' => 'italic', 'file' => 'google/open-sans-700i.woff2' ),
+		),
+	),
+)
+```
+
+- **Variant key** is the weight (100 to 900) plus `i` for italic: `400`, `700i`. Build one with
+  `Font_Library::variant_key( $weight, $style )`.
+- **Files** live under `uploads/wp3dconf-fonts/google/` or `.../custom/` and are named
+  `<family-slug>-<key>.<woff2|woff>`. The name is built from the family, weight and style, never from
+  the uploaded file name. `file` is stored relative to `uploads/wp3dconf-fonts/`. Files from before
+  1.3.6 sit at the folder root as `<slug>.woff2` and are still read.
+- **Readers are defensive.** An entry with an unknown weight, style or a file name that does not match
+  `^(?:(?:custom|google)/)?[a-z0-9_-]+\.woff2?$` is ignored, so a hand-edited option cannot point
+  outside the folder.
+
+| Method (all `public static`, `@since 1.3.6`) | Purpose |
+|---|---|
+| `families( $source = '' )` | Family names, sorted; filter by `google` or `custom` |
+| `has( $family )`, `source( $family )` | Existence and source |
+| `variants( $family )` | `key => { weight, style, file }`, lightest first, normal before italic |
+| `default_variant( $family )` | `400` if present, else the lightest key |
+| `variant_label( $key )`, `weight_labels()` | Names such as `Bold Italic` |
+| `path( $family, $variant = '' )`, `url( $family, $variant = '' )` | Absolute path or URL; an empty variant means the default |
+| `add_variant( $family, $source, $weight, $style, $bytes )` | Validate and store one file. Returns `true` or `WP_Error` |
+| `delete_variant( $family, $variant )`, `delete_family( $family )` | Remove files and entries |
+| `check_upload( $filename, $bytes )` | The upload type check: returns the MIME type or `WP_Error` |
+| `is_valid_name( $name )` | `^[A-Za-z0-9][A-Za-z0-9 ]{0,59}$` |
+
+`add_variant()` is the only gate. It rejects an invalid name, a Google family not in `font_list()`, a
+custom font named like a Google font, a source that differs from the family's existing source, a
+duplicate variant, more than 200 fonts or 18 variants per font, and any file that is not a woff or
+woff2 (see section 8).
+
+Limits are constants: `MAX_FONTS` 200, `MAX_VARIANTS` 18, `MAX_BYTES` 2 MB.
+
+`Custom_Text::font_path( $family )` and `font_url( $family )` read the library first and fall back to
+the old `uploads/wp3dconf-fonts/<slug>.woff2` path for fonts downloaded before 1.3.6.
+`Custom_Text::available_fonts()` is the library plus `font_list()`, and is what `selected_fonts()`
+checks a layer's choices against, so old layers keep working.
+
+### 4.2 The Fonts page
+
+`Fonts_Page` registers a submenu under the plugin menu (`?page=wp3dconf-fonts`). Every handler checks
+`manage_options` **and** a nonce, and a missing nonce is a failure.
+
+| Action | Hook | Does |
+|---|---|---|
+| `wp3dconf_upload_font` | `admin_post_` | Adds one custom font from a form of rows (style, weight, file) |
+| `wp3dconf_delete_font` | `admin_post_` | Deletes a variant, or the whole family when no variant is posted |
+| `wp3dconf_add_google_font` | `wp_ajax_` | Downloads up to 8 weights of one Google font and answers `{ added, errors }` |
+
+- **Upload.** Each row is tried on its own. The file name is only used to check the extension against
+  `Font_Library::MIME_TYPES` (`woff` => `font/woff`, `woff2` => `font/woff2`), and the contents must
+  match that type. Types are checked here and **not** added to WordPress's `upload_mimes`, so the
+  Media Library does not accept fonts.
+- **Google queue.** The page script sends one request per font and per batch of 4 weights
+  (`Fonts_Page::GOOGLE_CHUNK`), draws the progress bar from the answers, and warns before the tab is
+  closed. It is client-driven, so the tab must stay open. A clean run reloads with
+  `?wp3dconf_added=N`, which only shows a notice.
+- **Delete.** All delete buttons share one form; the script fills in the family and variant, asks for
+  confirmation and submits it.
+- **Data to the script** is `wp3dconfFonts`: `google` (family => variant keys), `installed`
+  (family => keys already added, as **strings**), `labels`, `ajaxUrl`, `action`, `nonce`, `chunk`,
+  `i18n`.
+
+`Google_Fonts::fetch( $family, array $variants )` makes one `css2` request for the Latin subset with
+`ital,wght@` tuples, then downloads each `woff2` from `fonts.gstatic.com` (512 KB each, `wOF2`
+signature checked). It returns `array<key, bytes|WP_Error>` or a single `WP_Error`. Variable fonts
+share one file, which is fetched once. It writes nothing; the caller passes the bytes to
+`Font_Library::add_variant()`.
+
+### 4.3 The Google font list
+
+`google-fonts.php` returns `family => variant keys` and is the only list an admin can choose from
+(`Custom_Text::font_list()` is its keys, run through the `font_list` filter).
+`Custom_Text::google_variants( $family )` returns the keys, through the `google_font_variants` filter,
+and falls back to `[ '400' ]`.
+
+Do not edit the file by hand. Regenerate it:
+
+```
+composer update-google-fonts                            # Fontsource, no key
+GOOGLE_FONTS_API_KEY=... composer update-google-fonts   # Google Developer API
+php build-scripts/update-google-fonts.php --dry-run     # preview, writes nothing
+```
+
+Options: `--source=google|fontsource`, `--key=`, `--dry-run`, `--force`, `--output=`. The script keeps
+only names `font_list()` accepts and families with a Latin subset, refuses to write fewer than 100
+families (a failed fetch), writes atomically, keeps the file's `@version`, and prints what was added,
+removed and changed. Fontsource lists weights and styles separately, so it assumes every weight has an
+italic; the Google API gives exact variants. A variant that does not exist fails to download with a
+per-weight error, nothing else.
+
+The whole list is only loaded in the admin and when a font is added or checked. The editor's dropdowns
+and shopper page loads read the library, not this file.
+
+### 4.4 The editor's font dropdowns
+
+`layer_settings_controls()` builds the **Fonts** and **Default Font** controls from
+`font_option_groups()`: `Custom Fonts` and `Google Fonts`, each left out when empty, and each holding
+only fonts in the library. They use these `Setting` flags, which any module can use on a `select` or
+`multiselect`:
+
+| Flag | Effect |
+|---|---|
+| `optgroup` | `{ "Group label": { value: label } }`: grouped options |
+| `filter` | Shows a search box in the dropdown |
+| `filter_placeholder` | Its placeholder text |
+
+A grouped PrimeVue select cannot mix grouped and ungrouped items, so **Default Font**'s "First
+selected font" sits in an `Automatic` group.
 
 ### Prices
 
@@ -219,12 +354,13 @@ All names start with `wp3dconf/custom_text/`.
 |---|---|---|
 | `frontend_payload` | `$payload`, `$post_id` | Change the data printed as `window.WP3dConf.customText` |
 | `layer_settings` | `$section` | Add, remove or change a setting in the "Custom Text" panel section |
-| `font_list` | `$families` | Add or remove selectable Google Fonts. Names that are not plain family names are dropped afterwards |
+| `font_list` | `$families` | Add or remove the Google families an admin can add on the Fonts page. Names that are not plain family names are dropped afterwards |
+| `google_font_variants` | `$variants`, `$family` | Change the variant keys (`400`, `700i`) offered for a Google family |
 | `offered_fonts` | `$offered`, `$settings` | Change the fonts a layer offers a shopper |
 | `default_font` | `$font`, `$settings`, `$offered` | Change the font used until the shopper picks one |
 | `layer_font_urls` | `$urls`, `$post_id` | Change the font file URLs sent to the frontend (e.g. serve them from a CDN) |
-| `max_font_downloads` | `$limit`, `$post_id` | Change the fonts downloaded per save (default 8) |
-| `download_font` | `$allow`, `$family`, `$path` | Return `false` to stop the Google request |
+| `max_font_downloads` | `$limit`, `$post_id` | Change the fonts downloaded per save for layers saved before 1.3.6 (default 8) |
+| `download_font` | `$allow`, `$family`, `$source` | Return `false` to stop a request to Google. `$source` is the array of variant keys when the Fonts page adds a font, and the file path for the old download on save. Check which with `is_array()` |
 | `clean_text` | `$text`, `$value`, `$settings` | Change the cleaned text |
 | `clean_style` | `$style`, `$entry`, `$settings` | Change a layer's cleaned style |
 | `clean_entry` | `$clean`, `$entry`, `$settings` | Change the full cleaned `{ text, font, style }` |
@@ -243,7 +379,10 @@ All names start with `wp3dconf/custom_text/`.
 |---|---|---|
 | `wp3dconf/custom_text/before_popup` | `$skin` | Before the Customize popup is printed |
 | `wp3dconf/custom_text/after_popup` | `$skin` | After the Customize popup is printed |
-| `wp3dconf/custom_text/font_downloaded` | `$family`, `$path` | After a font file is saved to the site |
+| `wp3dconf/custom_text/font_added` | `$family`, `$source`, `$variant`, `$path` | After a font file is stored in the library. `$source` is `google` or `custom` |
+| `wp3dconf/custom_text/font_variant_deleted` | `$family`, `$variant` | After one weight is deleted |
+| `wp3dconf/custom_text/font_deleted` | `$family` | After a whole font is deleted |
+| `wp3dconf/custom_text/font_downloaded` | `$family`, `$path` | After the old download on save stores a font (layers saved before 1.3.6) |
 
 ### 5.3 Core hooks this module uses (and you can also use)
 
@@ -251,7 +390,7 @@ All names start with `wp3dconf/custom_text/`.
 |---|---|---|---|
 | `wp3dconf/frontend/controls/layer_custom-text_html` | action | `$layer`, `$skin` | Renders the field via `wp3dconf_layer_template()` |
 | `wp3dconf/frontend/after_skin_display` | action | `$skin` | Prints the popup once |
-| `wp3dconf/editor/save_configurator` | action | `$post_id` | Priority 20: downloads selected fonts after core saved the settings |
+| `wp3dconf/editor/save_configurator` | action | `$post_id` | Priority 20: downloads selected Google fonts that are not in the library yet (layers saved before 1.3.6) |
 | `wp3dconf/data/custom_data_string` | filter | `$string`, `$uid`, `$custom_data`, `$data` | One-line summary |
 | `wp3dconf/data/custom_data_layer_price` | filter | `$price`, `$layer`, `$entry`, `$data` | Layer price |
 | `wp3dconf/quote/validation_errors` | filter | `$errors`, `$args` | Required-layer check for quotes |
@@ -281,7 +420,7 @@ action, register it at a later priority.
 
 ## 6. Recipes
 
-### 6.1 Limit the choice of fonts to a short list
+### 6.1 Limit the Google fonts an admin can add to a short list
 
 ```php
 add_filter( 'wp3dconf/custom_text/font_list', function ( $families ) {
@@ -289,17 +428,25 @@ add_filter( 'wp3dconf/custom_text/font_list', function ( $families ) {
 } );
 ```
 
+Fonts already in the library stay, even if they are no longer on the list.
+
 ### 6.2 Stop the plugin contacting Google
 
-Serve fonts yourself, or turn the download off. Fonts already on the site keep working.
+Block the download. Fonts already on the site keep working.
 
 ```php
 add_filter( 'wp3dconf/custom_text/download_font', '__return_false' );
 ```
 
-To supply your own files, copy a `.woff2` to the path `Custom_Text::font_path( $family )` returns
-(`uploads/wp3dconf-fonts/<family-slug>.woff2`), or react to `font_downloaded` to sync new files to
-your CDN.
+To supply your own files, add them as custom fonts on the Fonts page, or call
+`Font_Library::add_variant( 'My Font', Font_Library::SOURCE_CUSTOM, 400, 'normal', $bytes )` from your
+own code. To sync new files to a CDN, react to `font_added`:
+
+```php
+add_action( 'wp3dconf/custom_text/font_added', function ( $family, $source, $variant, $path ) {
+	my_cdn_upload( $path );
+}, 10, 4 );
+```
 
 ### 6.3 Block words
 
@@ -436,16 +583,24 @@ the JS.
 
 ## 8. Security notes
 
-- **No endpoint, no upload.** Custom Text has no `wp_ajax_*` handler. Its input arrives as part of
-  the normal add-to-cart or quote submission.
+- **Shopper input has no endpoint.** Custom Text has no shopper-facing `wp_ajax_*` handler. Its input
+  arrives as part of the normal add-to-cart or quote submission. The only handlers are the admin ones
+  on the Fonts page (section 4.2), each behind `manage_options` and a nonce.
 - **Cleaned on the server.** `clean_entry()` runs for every price, summary and check. The posted
   value is a request, not a fact.
 - **Escape summaries on output.** Text from `custom_data_string` and `style_summary` is plain text.
   If your add-on prints it into HTML, an email body or a PDF, escape it (`esc_html()`). A filter that
   adds markup to a summary row is your responsibility to escape.
-- **Fonts.** Names come only from `font_list()` and are validated (`^[A-Za-z0-9][A-Za-z0-9 ]{0,59}$`)
-  before they reach a URL or file name. Downloads go to fixed Google hosts, must be woff2 and are
-  limited to 512 KB. Do not loosen these in a filter. `download_font` can only stop a download.
+- **Fonts.** Names are validated (`^[A-Za-z0-9][A-Za-z0-9 ]{0,59}$`) before they reach a URL or file
+  name, and Google names must also be in `font_list()`. Downloads go to fixed Google hosts, must be
+  woff2 and are limited to 512 KB. `download_font` can only stop a download.
+- **Uploaded fonts.** Nothing from the upload decides where a file goes: the path is built from the
+  sanitised family, weight and style. The file must end in `.woff` or `.woff2`, start with the `wOFF`
+  or `wOF2` signature, declare a length equal to its real size (so a font with data appended is
+  refused), be at least 44 bytes and at most 2 MB, and its extension must match its signature. The
+  folder holds an `index.php` placeholder. Fonts are not added to `upload_mimes`, so nobody can put a
+  font in the Media Library through this feature, and only users with `manage_options` reach the
+  upload handler.
 - **Cross-origin canvas.** The text is drawn from scratch, so the canvas is never tainted. Fonts are
   loaded from your own uploads folder; if you move them to a CDN with `layer_font_urls`, send CORS
   headers, or the `FontFace` load fails and the standard font is used.
@@ -458,10 +613,12 @@ the JS.
 |---|---|
 | Blank page / *failed to resolve module specifier* | An `import` was added without updating `frontend_script_modules()` |
 | Field shows no Customize button | No control ticked and fewer than two fonts offered |
+| The editor's **Fonts** list is empty | The library is empty. Add fonts on the Fonts page; the dropdown no longer lists the whole Google list |
+| "Add weights" lists weights the font already has | `wp3dconfFonts.installed` holds numbers instead of strings; `array_keys()` turns `"400"` into `400`. Map them with `strval` |
 | Customize button label appears but nothing to click | kses stripped the button; check `allowed_html_tags()` |
 | Text on the model is upside down or mirrored | The mesh's UVs (see the Blender guide), or `swapTexture()` called without `{ flipY: false }` |
 | Text tiny or off-centre | Print zone could not be measured, so the 85% fallback is used; check the mesh has a transparent placeholder texture |
-| Font missing for shoppers | The file is not in `uploads/wp3dconf-fonts/`; check the layer was saved and `download_font` is not blocking |
+| Font missing for shoppers | The font is not in the library, or its file is missing from `uploads/wp3dconf-fonts/`. Check the Fonts page, and that `download_font` is not blocking for a font from before 1.3.6 |
 | Shopper's colour ignored on the server | `color` is not in `custom_text_controls` for the layer |
 | Price differs between page and cart | A `layer_price` or `character_count` filter has no matching JS callback |
 | Required layer passes with only spaces | It should not: `clean_text()` trims. Check a `clean_text` filter is not adding characters |

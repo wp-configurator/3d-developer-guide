@@ -3,7 +3,7 @@
 **Audience:** shop owners setting up Custom Text in the configurator editor.
 **Not for:** 3D artists (see [custom-text-blender-guide.md](custom-text-blender-guide.md)) or developers (see [custom-text-developer-guide.md](custom-text-developer-guide.md)).
 **Applies to:** plugin v1.3.6
-**Last updated:** 2026-10-30
+**Last updated:** 2026-11-04
 
 Custom Text lets your customers type their own words - a name, a number, a short message - and see them appear on the 3D model as they type. Think of a name on the back of a shirt, a number on a jersey, or initials on a mug.
 
@@ -13,10 +13,11 @@ Custom Text lets your customers type their own words - a name, a number, a short
 
 ## Before you start
 
-You need two things:
+You need two things, and one optional step:
 
 1. **The module switched on.** Go to **wp3dconf → Modules** and turn on **Custom Text**.
 2. **A model that has a place for the text.** Your 3D designer prepares a part of the model (a "text mesh") that the words are drawn on. If you are not sure whether your model has one, send your designer the [Blender guide](custom-text-blender-guide.md).
+3. **Fonts to offer (only if you want customers to choose a font).** Add them once on the **Fonts** page. See [Add your fonts](#add-your-fonts-the-fonts-page).
 
 ---
 
@@ -69,16 +70,67 @@ Characters that are not allowed are removed as the customer types, so what they 
 | Setting | What it does |
 |---|---|
 | **Text Color** | The colour of the text. This is the starting colour; you can let customers change it (see *Shopper Controls*). |
-| **Fonts** | The fonts customers can choose from. Pick as many as you like from the Google Fonts list. |
-| **Default Font** | The font used until the customer picks one. It must also be ticked in **Fonts**; if it is not, the first ticked font is used. |
+| **Fonts** | The fonts customers can choose from. The list holds the fonts you added on the **Fonts** page, in two groups: **Custom Fonts** and **Google Fonts**. Type in the search box to find one. |
+| **Default Font** | The font used until the customer picks one. It must also be picked in **Fonts**. **First selected font** uses the first font you picked. |
 
 Leave **Fonts** empty to use one standard font and give customers no font choice.
 
-**About the fonts.** The fonts are downloaded to your own website when you click **Save** in the editor, so your customers' browsers never contact Google. A few things to know:
+If the **Fonts** list is empty, you have not added any fonts yet. Add them on the **Fonts** page first.
 
-- Up to 8 new fonts are downloaded each time you save. If you pick more, save again to get the rest.
-- If a font could not be downloaded (for example your server could not reach Google), customers will not be offered it. Save again to retry.
-- Only the regular weight and the Latin alphabet are downloaded.
+---
+
+## Add your fonts (the Fonts page)
+
+Go to **wp3dconf → Fonts**. This page is the one place where you decide which fonts exist on your site. The editor only shows what you add here, so a short list stays easy to pick from.
+
+### Add Google fonts
+
+1. Click the **Fonts** box under **Add Google fonts** and search for a font. Pick as many as you like.
+2. Each font you pick gets its own row with a **Weights** box. **Regular** is already chosen. Add more weights (Bold, Italic and so on), or press **All** to take every weight. **Remove** drops that font from the list.
+3. Click **Add fonts**. A progress bar shows each font as it is downloaded, one after the other.
+4. When it finishes, the page reloads and your fonts are listed under **Google fonts**.
+
+Things to know:
+
+- Keep the page open until the bar finishes. If you leave, the rest is not added. **Cancel** stops after the batch being downloaded.
+- The files are downloaded to your own website, so your customers' browsers never contact Google.
+- Only the Latin alphabet is downloaded.
+- If a weight cannot be downloaded (for example Google does not have it for that font), it is listed under the bar and the rest carry on. Add the others again later if you need to.
+- To add more weights to a font you already added, use the **Add weights** box beside it in the list.
+
+### Add your own font
+
+Use this for a font you bought or designed, as a `.woff` or `.woff2` file.
+
+1. Under **Add a custom font**, type a **Font name**. This is what shows in the dropdown. Use letters, numbers and spaces only.
+2. Under **Font files**, each row is one weight. Choose its **Style** (Normal or Italic), its **Weight** (100 Thin to 900 Black), then press **Choose file** and pick the file. Press **Add** for another row.
+3. Tick the box to confirm you have the right to use the font on the web, then click **Upload font**.
+
+Things to know:
+
+- One file per weight and style, up to 2 MB each. A weight you leave out is not offered.
+- To add a weight to a font you already uploaded, upload again with the **same font name**.
+- A custom font cannot share a name with a Google font. Choose a different name.
+- Every row is tried even if another fails. The message lists what went wrong.
+
+### Delete a weight or a font
+
+Each weight shows as a small tag in the list. Click the **×** on a tag to delete that weight, or **Delete font** to delete the font and all its weights. You are asked to confirm.
+
+A deleted font is no longer offered to customers. A layer that used it falls back to its other fonts, or to the standard font if there are none.
+
+### What customers see
+
+Today a customer sees each font in one weight: **Regular**, or the lightest weight the font has if there is no Regular. The other weights you add are stored on your site, but the **Customize** popup does not offer a weight choice yet.
+
+### Limits
+
+| | |
+|---|---|
+| Fonts on the site | 200 |
+| Weights and styles per font | 18 |
+| File size | 2 MB each |
+| File types | `.woff`, `.woff2` |
 
 ---
 
@@ -163,8 +215,11 @@ Only the things the customer changed are listed. Style settings left at your def
 |---|---|
 | Message *"not set up correctly"* appears | Pick a **Target Mesh(es)** for the layer. |
 | Text appears in the wrong place, stretched or upside down | This is the model, not a setting. Send your designer the [Blender guide](custom-text-blender-guide.md). |
-| Customers cannot choose a font | Make sure fonts are ticked in **Fonts**, then **Save** and wait for the save to finish. A font that did not download is not offered. |
-| A font is missing after saving many | Only 8 new fonts download per save. Save again. |
+| The **Fonts** list in the editor is empty | Add fonts on the **wp3dconf → Fonts** page first, then reload the editor. |
+| Customers cannot choose a font | Pick at least two fonts in **Fonts** on the layer, then **Save**. A font that was deleted from the **Fonts** page is not offered. |
+| A Google font fails to add | The reason is listed under the progress bar. Your server may not be able to reach Google; try again later. |
+| A font you picked earlier no longer shows as picked | It was saved before the **Fonts** page existed. Add it on the **Fonts** page, then pick it again on the layer. Until then it still works for customers. |
+| Uploading a font fails | Use a real `.woff` or `.woff2` file under 2 MB whose ending matches its type. A renamed file of another type is refused. |
 | No **Customize** button | Tick at least one **Shopper Controls** option, or offer more than one font. |
 | Customers cannot change the colour | Tick **Text color** under **Shopper Controls** on this layer. Layers saved before this option existed do not have it ticked. |
 | Text is cut short | The customer reached **Max Length**. |
