@@ -2,8 +2,8 @@
 
 **Audience:** developers and theme authors building a custom frontend skin.
 **Not for:** shop owners (plugin settings) or 3D artists.
-**Applies to:** plugin v1.3.5
-**Last updated:** 2026-10-16
+**Applies to:** plugin v1.3.7
+**Last updated:** 2026-11-05
 
 Skins control how the configurator is rendered on the frontend — the layout, the controls structure, the canvas placement, and any surrounding UI. The plugin ships with two built-in skins (`default` and `accordion`). You can create your own by extending `Skin_Base` and registering it via the `wp3dconf/register_skins` hook.
 
@@ -328,7 +328,41 @@ add_action( 'wp3dconf/register_skins', function() {
 
 ---
 
-## 9. Removing or Replacing a Built-in Skin
+## 9. Skin Options and Shortcodes
+
+Registering a skin is all it takes to place it on a page. The plugin generates a shortcode for it, `[wp3dconf_my_skin id="12"]` (hyphens in the skin name become underscores), and lists it in the block and in every supported page builder. See [`embed-configurator.md`](embed-configurator.md) for how site owners use these.
+
+To give the skin its own options, extend the settings schema. The shortcode attributes, the block's Display panel and the page builder controls are all generated from it:
+
+```php
+public static function get_settings_schema() {
+	return array_merge(
+		parent::get_settings_schema(),
+		array(
+			'my_skin_open_first' => array(
+				'type'    => 'toggle', // toggle, select, number or text.
+				'label'   => __( 'Open first group', 'wp-3d-configurator' ),
+				'default' => true,
+			),
+		)
+	);
+}
+```
+
+Read a value inside the skin with `$this->get_setting( 'my_skin_open_first' )`. A `select` also needs an `options` array of value => label.
+
+`Skin_Base` already declares four toggles: `show_toolbar`, `show_total_price`, `show_summary` and `show_form`. They apply when the skin's template prints those sections with `get_toolbar_html()`, `get_total_price_html()`, `get_summary_html()` and `get_form_html()`. A template that prints them another way ignores the toggles.
+
+Keep in mind:
+
+- Register the skin by `plugins_loaded` priority 20. The `wp3dconf/register_skins` hook already does. Later is too late for shortcodes and builders.
+- The skin must extend `Skin_Base`. Any other class gets an empty schema.
+- Page builders merge options by key, so use one key with the same type and default across skins, or prefix skin-specific keys as above.
+- The skin's label in pickers is made from its name (`my-skin` becomes "My Skin").
+
+---
+
+## 10. Removing or Replacing a Built-in Skin
 
 Use the `wp3dconf/registered_skins` filter to modify the registry after all skins have been registered.
 
