@@ -3,7 +3,7 @@
 **Audience:** developers extending or integrating the Conditional Logic module, and anyone tracing how a rule is evaluated.
 **Not for:** shop owners learning the rule builder in the editor.
 **Applies to:** plugin v1.3.5
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-29
 
 The Conditional Logic module lets a configurator react to the customer's own choices — show or hide a group when an option is picked, apply a discount once a total crosses a threshold, disable a layer until another one is selected. It's a self-contained module (`modules/conditional-logic/`) built entirely on the `Module_Base` contract described in [`extend-modules.md`](extend-modules.md) — it's actually that document's own worked reference implementation, so this page focuses on what the module *does* rather than how modules are wired in general.
 
@@ -57,17 +57,17 @@ Everything lives under a single post meta entry, `_wp3dconf_conditional_logic` (
 
 ### Rule Types
 
-Fourteen rule types are defined and sanitized (so third-party code or a future editor build can rely on them round-tripping), but only a subset is actually wired into the editor UI and the frontend runtime in this build — the rest are preserved on save/load but inert. The gate is `Data::SUPPORTED_LOGIC_TYPES` / `Data::SUPPORTED_ACTION_TYPES`, kept in sync with the editor's own `utils/capabilities.ts`.
+Fourteen rule types are defined and sanitized (so third-party code or a future editor build can rely on them round-tripping), but only a subset is actually wired into the editor UI and the frontend runtime in this build — the rest are preserved on save/load but inert. The gate is `Data::SUPPORTED_LOGIC_TYPES` (`is_state`, `field_value`, `formula_result`, `option_price`, `total_price`) / `Data::SUPPORTED_ACTION_TYPES` (`set_state`), kept in sync with the editor's own `utils/capabilities.ts`.
 
 | Section | Type | Supported (wired) | Shape |
 |---|---|:---:|---|
 | Logic (IF)  | `is_state` | ✅ | `{ state, target: uid[], match: 'any'\|'all' }` — `state` ∈ `selected`, `deselected`, `shown`, `hidden`, `enabled`, `disabled`, `opened`, `closed` |
-| Logic (IF)  | `option_price` | ✅ | `{ target: uid, comparator, value }` |
+| Logic (IF)  | `option_price` | ✅ | `{ target: uid, comparator, value }` — shown as **Layer price**. What the layer costs in this pricing pass (`store.getLayerAmounts( uid )`): a select's chosen option, a Range's tier, a price-mode formula. False while the layer isn't selected. |
 | Logic (IF)  | `total_price` | ✅ | `{ comparator, value }` |
 | Logic (IF)  | `layer_count` |  | `{ target: uid, comparator, value }` |
 | Logic (IF)  | `text_length` |  | `{ target: uid, comparator, value }` |
-| Logic (IF)  | `field_value` |  | `{ target: uid, comparator, value }` — comparator is numeric or string (`equals`, `contains`, `starts_with`, ...) |
-| Logic (IF)  | `formula_result` |  | `{ target: uid, comparator, value }` |
+| Logic (IF)  | `field_value` | ✅ | `{ target: uid, comparator, value }` — shown as **Layer value**. Numeric comparators compare numbers (a Range after snapping); string comparators (`equals`, `contains`, `starts_with`, ...) compare text, and a checkbox's list entry by entry. |
+| Logic (IF)  | `formula_result` | ✅ | `{ target: uid, comparator, value }` — shown as **Formula result**. Numeric comparators against the formula's unrounded result. See [formula.md](formula.md). |
 | Action (THEN) | `set_state` | ✅ | `{ state, target: uid[] }` — `state` ∈ `select`, `deselect`, `show`, `hide`, `enable`, `disable`, `open`, `close` |
 | Action (THEN) | `apply_discount` |  | `{ mode: 'percent'\|'fixed', value, scope: 'total'\|'item'\|uid }` |
 | Action (THEN) | `set_limit` |  | `{ target: uid, limit: 'max_chars'\|'min_chars'\|'max_selections'\|'min_selections', value }` |
@@ -89,10 +89,12 @@ The frontend bundle (`modules/conditional-logic/assets/frontend/conditional-logi
 ### Binding
 
 ```
-window.WP3dConf.addAction('wp3dconf/frontend/data/initialized', ({ store }) => {
+window.WP3dConf.addAction('wp3dconf/frontend/data/ready', ({ store }) => {
   // one evaluator instance per configurator, bound here
 });
 ```
+
+It binds on `data/ready` rather than `data/initialized` (since 1.3.5), once defaults are filled in, formulas are switched on and the first total is worked out, so a rule reading a value or a price never acts on blanks. `wp3dconf/cl/bound` therefore fires after the first pricing pass.
 
 It waits for `wp3dconf/frontend:ready` if the hook bus isn't present yet (the host frontend bundle loads as a deferred ES module, so ordering isn't guaranteed), same handshake described in `extend-modules.md`'s frontend entry section.
 
@@ -106,6 +108,7 @@ Once bound, the evaluator listens on these host events and re-runs every conditi
 - `wp3dconf/frontend/layer/hidden`
 - `wp3dconf/frontend/layer/enabled`
 - `wp3dconf/frontend/layer/disabled`
+- `wp3dconf/frontend/layer/customDataUpdated`
 - `wp3dconf/frontend/group/opened`
 - `wp3dconf/frontend/group/closed`
 - `wp3dconf/frontend/data/priceUpdated`
@@ -124,6 +127,12 @@ Each pass:
 ### `is_state` against a group
 
 `is_state` targeting a group UID (rather than a leaf layer) doesn't check the group's own selection state — it recurses into the group's descendant leaf layers and applies `match` (`any`/`all`) across them. A group's `opened`/`closed` state is the one exception evaluated directly on the group itself, since "opened" has no meaning for a leaf.
+
+### Actions on fields and formulas
+
+- A `set_state: select` under a single-choice group clears only the group's other `option` and `colorpicker` layers, like a click. It never clears a custom field, a Range or a formula.
+- Hiding or disabling a layer doesn't deselect it: a hidden Range keeps its value, price and cart line.
+- **Hiding a price-mode formula doesn't remove its charge.** The server never evaluates Conditional Logic; put the condition in the formula with `if()`.
 
 ### Runtime warnings
 

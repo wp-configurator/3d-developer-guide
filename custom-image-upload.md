@@ -5,7 +5,7 @@ plugins.
 **Not for:** shop owners (plugin settings) or 3D artists (see
 [custom-image-upload-blender-guide.md](custom-image-upload-blender-guide.md)).
 **Applies to:** plugin v1.3.5
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-29
 
 Read [extend-modules.md](extend-modules.md) first for the general module contract. This guide covers
 only what is specific to this module and where you can hook into it.
@@ -170,7 +170,7 @@ repositories depend on them.
 | `wp3dconf/editor/save_configurator` | action | `$post_id` | Priority 20: extracts mask path after core saved settings |
 | `wp3dconf/frontend/data` | filter | `$data`, `$post_id` | Adds attachment URLs for saved images |
 | `wp3dconf/data/custom_data_string` | filter | `$string`, `$uid`, `$custom_data`, `$data` | Plain-text summary (cart, email, PDF) |
-| `wp3dconf/data/custom_data_html` | filter | `$html`, `$uid`, `$item` | Original/Edited image links |
+| `wp3dconf/data/custom_data_html` | filter | `$html`, `$uid`, `$item`, `$summary_data` | Original/Edited image links |
 | `wp3dconf/data/custom_data_layer_price` | filter | `$price`, `$layer`, `$custom_data`, `$data` | Returns the layer's configured price |
 | `wp3dconf/quote/validation_errors` | filter | `$errors` (`WP_Error`), `$args` | Required-layer check for quotes |
 | `woocommerce_add_to_cart_validation` | filter | `$passed`, `$product_id` | Same check for WooCommerce |

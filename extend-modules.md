@@ -3,7 +3,7 @@
 **Audience:** developers building a new module or an add-on that registers one.
 **Not for:** shop owners or 3D artists.
 **Applies to:** plugin v1.3.5
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-29
 
 This document is the full process for adding a new feature module to
 wp-3d-configurator, backend (PHP) and frontend (Vue/TS) together. Follow it
@@ -110,10 +110,8 @@ two ways to do that - pick one.
 
 ```php
 private static $module_files = array(
-	'get-a-quote'    => '/get-a-quote/class-get-a-quote.php',
-	'contact-form-7' => '/contact-form-7/class-contact-form-7.php',
-	'woocommerce'    => '/woocommerce/class-woocommerce.php',
-	'my-module'      => '/my-module/class-my-module.php',
+	'woocommerce' => '/woocommerce/class-woocommerce.php',
+	'my-module'   => '/my-module/class-my-module.php',
 );
 ```
 
@@ -199,6 +197,8 @@ backs it:
 | `init()` | Any extra hook wiring beyond the standard contract (e.g. WooCommerce-specific hooks) |
 | `toolbar_icon()` | Return `['id' => ..., 'icon' => ..., 'label' => ...]` to add an editor toolbar icon, or `null` (default) for none |
 | `layer_type()` | Return `['slug' => ..., 'name' => ..., 'icon' => ...]` to add a custom layer type to the "Model Structure" tab's draggable layer list, or `null` (default) for none |
+| `layer_types()` | Return a list of those definitions when the module registers several layer types (Custom Fields registers seven); defaults to `layer_type()` alone |
+| `layer_settings_controls( $settings )` | Mutate the per-layer settings schema. Gate additions to your own type with `'conditions' => array( 'terms' => array( array( 'layer_type', 'my-type', '===' ) ) )`, or they show on every layer. Returns `$settings` unchanged by default. |
 | `global_settings_controls( $settings )` | Mutate the editor's global-settings schema (`Editor_Data::get_global_settings_controls()`) - e.g. add an option to an existing control such as `_wp3dconf_form`, or add a whole new settings section; returns `$settings` unchanged by default |
 | `editor_payload( $post_id )` | Return an array to expose as `window.editorData.<key>` in the editor, or `null` (default) for nothing |
 | `frontend_payload( $post_id )` | Return an array to expose as `window.WP3dConf.<key>` on the frontend, or `null` (default) for nothing |
@@ -241,7 +241,8 @@ to. You don't fire these yourself - they're listed here so you know where
 your overrides actually run:
 
 - `wp3dconf/editor/toolbar_icons` (filter) - collects every module's `toolbar_icon()`
-- `wp3dconf/editor/layer_types` (filter) - collects every module's `layer_type()`
+- `wp3dconf/editor/layer_types` (filter) - collects every module's `layer_type()` / `layer_types()`
+- `wp3dconf/editor/layer_settings_controls` (filter) - collects every module's `layer_settings_controls()`
 - `wp3dconf/editor/global_settings_controls` (filter) - collects every module's `global_settings_controls()`
 - `wp3dconf/editor/after_enqueue` (action) - fires while `wp3dconf-editor` is enqueued; triggers your editor bundle enqueue
 - `wp3dconf/editor/data` (filter) - builds `window.editorData`; collects every module's `editor_payload()`
