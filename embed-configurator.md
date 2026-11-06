@@ -11,7 +11,7 @@ A configurator can be placed on any page or post with a shortcode, a block, or a
 
 ## Shortcode
 
-Copy it from **3D Configurators → Shortcode** column (Copy button), or write it by hand:
+Find it in the **Shortcode** column of **3D Configurators**. Click the field to select it, then copy it (Ctrl/Cmd+C). Or write it by hand:
 
 ```
 [wp3dconf id="12"]
