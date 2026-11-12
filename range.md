@@ -242,7 +242,7 @@ The runtime **fires** `wp3dconf/frontend/layer/customDataUpdated` (`{ uid, layer
 after the first, and `wp3dconf/frontend/layer/activated` on the first. `wp3dconf/frontend/data/ready`
 (`{ store }`) fires once defaults are in and the first total is worked out — a safe point to read every
 Range. A Range never goes through the option-click path, so it never fires
-`wp3dconf/frontend/user/option_clicked` and never triggers a [Model Animation](model-animation.md).
+`wp3dconf/frontend/user/option_clicked` and never triggers a [Model Animation](model-animation-developer-guide.md).
 
 All filters must return their first argument untouched for layers that are not Ranges. The mirror of the
 PHP surcharge above, registered after the module's own filter:

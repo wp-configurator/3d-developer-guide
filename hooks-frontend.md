@@ -192,7 +192,7 @@ Fire when a group/subgroup layer is expanded or collapsed in the controls UI.
 
 #### `wp3dconf/frontend/user/group_toggled` / `wp3dconf/frontend/user/option_clicked`
 
-Fire only for a shopper's own clicks — not for initial state, Conditional Logic actions or field edits. Used by [Model Animation](model-animation.md). *(1.3.5)*
+Fire only for a shopper's own clicks — not for initial state, Conditional Logic actions or field edits. Used by [Model Animation](model-animation-developer-guide.md). *(1.3.5)*
 
 | Hook | Payload |
 |------|---------|

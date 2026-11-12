@@ -61,7 +61,7 @@ Applying goes through `store.applyConfiguration()`, which changes the selection 
 - Everything leaving is deactivated first, then everything new is activated, so a swapped mesh is put back before its replacement goes on.
 - Prices, canvas changes, and the `layer/activated` / `layer/deactivated` hooks run as for a click, so [Conditional Logic](conditional-logic.md) re-evaluates as usual.
 - A group the inspiration does not list gets its default. A listed group gets exactly the listed options that still exist; a single-choice group keeps only one; a required group that would end up empty falls back to its default.
-- `user/option_clicked` does **not** fire, so modules that react only to a visitor's own clicks (such as [Model Animation](model-animation.md)) are not triggered.
+- `user/option_clicked` does **not** fire, so modules that react only to a visitor's own clicks (such as [Model Animation](model-animation-developer-guide.md)) are not triggered.
 
 ---
 
