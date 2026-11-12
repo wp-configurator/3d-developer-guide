@@ -56,14 +56,23 @@ Each type declares **capability flags** in `get_capabilities()` (`placeholder`, 
 | `get_slug()`, `get_name()`, `get_icon()` | abstract | every type |
 | `get_value_label()` | `get_name()` | every bundled type |
 | `get_capabilities()` | none | every bundled type |
-| `resolve_value( $stored, $settings )` | stored value, else `field_default` | choice types (marked choices), switch (`field_checked`), range (normalised), file (only references that check out) |
+| `resolve_value( $stored, $settings, $context )` | stored value, else `field_default` | choice types (marked choices), switch (`field_checked`), range (normalised), file (only references that check out) |
 | `get_template_args( $field, $skin )` | unchanged | choice types (options, chosen), switch and range (their handlers, the scale), file (the files and the picker's limits) |
-| `get_amounts( $settings, $raw )` | the layer's own price pair | choice types (adds chosen choices), range (tiers / per unit), file (Price Per File for each file) |
-| `get_summary( $raw, $settings )` | the value on one line | choice types (labels), switch (empty), range (value and unit), file (file names) |
-| `is_answered( $raw, $settings )` | a non-empty value | file (at least one file that checks out) |
+| `get_amounts( $settings, $raw, $context )` | the layer's own price pair | choice types (adds chosen choices), range (tiers / per unit), file (Price Per File for each file) |
+| `get_summary( $raw, $settings, $context )` | the value on one line | choice types (labels), switch (empty), range (value and unit), file (file names) |
+| `is_answered( $raw, $settings, $context )` | a non-empty value | file (at least one file that checks out) |
 | `get_settings_controls()` | none | file (formats, size and count; see below) |
 
 `get_slug()` must not translate: `Fields::register()` reads it on `after_setup_theme`, before `init`.
+
+The four value methods take a last `$context` array saying which field the value belongs to: `uid`, `config_id` (0 when the caller doesn't know it) and `layer`. Any key can be missing, so read them with a default. Most types ignore it; File Upload uses it to count only files uploaded to that field. Add the argument to any override, even if unused, or PHP rejects the class:
+
+```php
+public function get_amounts( $settings = array(), $raw = null, $context = array() ) {
+	$uid = isset( $context['uid'] ) ? $context['uid'] : '';
+	// ...
+}
+```
 
 ### Adding a field type
 
@@ -265,10 +274,10 @@ For a choice type both add the layer's own configured `price`/`sale_price` plus 
 
 ### The stored value
 
-`customData[uid].value` is a list of references, `<attachment id>:<secret>`. The secret goes only to the browser that uploaded the file; the attachment keeps an HMAC of it under `_wp3dconf_field_file`, with the configurator, the field uid, the original name, the extension and the size. `File_Uploads::get_files( $raw, $settings )` turns a value back into files, keeping only references that check out, in a format the field allows, without duplicates, up to Max Files. Price, summary and the required check all go through it, so a guessed or copied attachment id counts for nothing.
+`customData[uid].value` is a list of references, `<attachment id>:<secret>`. The secret goes only to the browser that uploaded the file; the attachment keeps an HMAC of it under `_wp3dconf_field_file`, with the configurator, the field uid, the original name, the extension and the size. `File_Uploads::get_files( $raw, $settings, $uid, $config_id )` turns a value back into files, keeping only references that check out, uploaded to that field (and configurator, when given), in a format the field allows, without duplicates, up to Max Files. Price, summary and the required check all go through it with the field's `$context`, so a guessed attachment id, or a reference copied from another field, counts for nothing. The browser applies the same rule.
 
 ```php
-foreach ( File_Uploads::get_files( $raw, $settings ) as $file ) {
+foreach ( File_Uploads::get_files( $raw, $settings, $uid, $config_id ) as $file ) {
 	// $file: ref, id, name, ext, size, url, config_id, uid.
 }
 ```
