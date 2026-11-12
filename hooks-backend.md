@@ -7,6 +7,8 @@
 
 Actions and filters available in the WordPress admin - covering the configurator editor and general admin/settings areas.
 
+Modules document their own hooks in their own guides. For the editor side of Custom Fields (`wp3dconf/custom_fields/settings_controls`, `editor_payload`, `type_definition`) see [custom-fields.md](custom-fields.md#extension-points).
+
 ---
 
 ## JavaScript - Lifecycle Events
@@ -289,6 +291,28 @@ add_action( 'wp3dconf/admin/register_submenus', function() {
 > filters directly — see [`extend-modules.md`](extend-modules.md). They exist
 > as plain WordPress filters too because `Module_Base` itself is built on top
 > of them.
+
+#### `wp3dconf/import/remap_attachments`
+
+*Since 1.4.0.* Filters a configurator's meta during an import, or when one is created from a template, after its images have been sideloaded. Core remaps the attachment IDs it knows about (the 3D model, layer icons and textures); a module that keeps attachment IDs in its own meta swaps them here. List those images in `_wp3dconf_attachment_urls` when saving so they are exported and sideloaded. Runs with an empty map when nothing was sideloaded. An ID missing from the map belonged to the other site, so clear it rather than keep it. See `Inspiration_Gallery::remap_imported_thumbnails()`.
+
+| Parameter    | Type  | Description |
+|--------------|-------|-------------|
+| `$meta_data` | Array | Imported meta, keyed by meta key |
+| `$id_map`    | Array | Old attachment ID (string) => new attachment ID |
+| `$post_id`   | Int   | The new configurator post ID |
+
+```php
+add_filter( 'wp3dconf/import/remap_attachments', function( $meta_data, $id_map ) {
+  if ( isset( $meta_data['_my_addon_image'] ) ) {
+    $old = (string) $meta_data['_my_addon_image'];
+    $meta_data['_my_addon_image'] = isset( $id_map[ $old ] ) ? $id_map[ $old ] : 0;
+  }
+  return $meta_data;
+}, 10, 2 );
+```
+
+---
 
 #### `wp3dconf/admin/settings_fields`
 

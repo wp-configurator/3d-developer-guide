@@ -2,7 +2,7 @@
 
 **Audience:** developers adding support for another page builder, or changing a bundled one.
 **Not for:** site owners placing a configurator (see [`embed-configurator.md`](embed-configurator.md)).
-**Applies to:** plugin v1.3.7
+**Applies to:** plugin v1.4.0
 **Last updated:** 2026-11-05
 
 Every way of placing a configurator on a page, whether the shortcode, the block or a page builder element, is an *integration*. An integration only translates its host's settings into one call to `Renderer::render()`. Access checks, asset loading and skin handling stay in `Renderer`, so a new integration is small.

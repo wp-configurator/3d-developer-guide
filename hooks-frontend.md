@@ -7,6 +7,8 @@
 
 Actions and filters available on the customer-facing configurator page - both JavaScript (Alpine.js) and PHP.
 
+Modules document their own hooks in their own guides: Custom Fields (`wp3dconf/custom_fields/*`, `wp3dconf/frontend/customFields/*`) in [custom-fields.md](custom-fields.md#extension-points), Custom Text (`wp3dconf/custom_text/*`) in [custom-text-developer-guide.md](custom-text-developer-guide.md).
+
 ---
 
 ## JavaScript - Lifecycle Event
@@ -237,6 +239,24 @@ addAction('wp3dconf/frontend/canvas/apply', function({ uid, layer, targetMeshes,
 
 ---
 
+#### `wp3dconf/frontend/configuration/applied`
+
+*Since 1.4.0.* Fires once after `store.applyConfiguration()` has replaced the whole selection, for example when a visitor applies an [inspiration](inspiration-gallery.md) or undoes one. Each layer that left or arrived has already fired `layer/deactivated` or `layer/activated`.
+
+| Parameter       | Type   | Description |
+|-----------------|--------|-------------|
+| `store`         | Object | The Alpine.js store instance |
+| `configuration` | Object | The selection now applied, `{ parentUid: [childUid] }`, after defaults were filled in and missing options dropped |
+| `previous`      | Object | The configuration it replaced, `{ activeLayers, customData }`; pass it back to `applyConfiguration()` to undo |
+
+```js
+addAction('wp3dconf/frontend/configuration/applied', function({ configuration, store }) {
+  // Refresh anything that summarises the whole selection.
+}, 10);
+```
+
+---
+
 ## JavaScript Filters
 
 #### `wp3dconf/frontend/price/layer_amounts`
@@ -305,6 +325,34 @@ addFilter('wp3dconf/frontend/summary/layerCustomData', function(data, { uid, sto
 
 ---
 
+#### `wp3dconf/frontend/summary/layerThumbnail`
+
+Filters the image shown beside a layer in the summary popup. Return an image URL; the popup draws it as a CSS `background-image`, never as markup. Used by Custom Image Upload for the shopper's image, and by Custom Fields for the first image uploaded to a File Upload field.
+
+| Parameter   | Type          | Description |
+|-------------|---------------|-------------|
+| `thumbnail` | String\|null  | Image URL, or `null` |
+| `context`   | Object        | `{ uid, store }` |
+
+---
+
+#### `wp3dconf/frontend/summary/layerThumbnailText` *(since 1.4.0)*
+
+Filters short text shown in the same grey thumbnail box when the layer has no image, such as a file type. Printed with `x-text`, never as markup. Used by Custom Fields to show `PDF`, `DOCX` and so on for a File Upload field with no image.
+
+| Parameter | Type          | Description |
+|-----------|---------------|-------------|
+| `text`    | String\|null  | Text, or `null` |
+| `context` | Object        | `{ uid, store }` |
+
+```js
+addFilter('wp3dconf/frontend/summary/layerThumbnailText', function(text, { uid, store }) {
+  return store.layers[uid]?.type === 'my-type' ? 'NEW' : text;
+}, 10);
+```
+
+---
+
 #### `wp3dconf/frontend/submit/blocked`
 
 Filters whether the add-to-cart / Get a Quote submission should be blocked. Return `true` to block. Used by Custom Fields to block submission while a required field is empty.
@@ -342,6 +390,23 @@ addFilter('wp3dconf/frontend/storeValuesToRetrieveParams', function(params, stor
 ---
 
 ## PHP Actions
+
+#### `wp3dconf/frontend/toolbar/icons`
+
+*Since 1.4.0.* Fires inside the toolbar (`templates/toolbar.php`), after the share icon, for a module's own toolbar icon. Print a `<span>` so it takes the toolbar's round icon style. A theme that overrides `toolbar.php` needs to keep this hook for such icons to appear.
+
+| Parameter    | Type      | Description |
+|--------------|-----------|-------------|
+| `$skin`      | Skin_Base | The skin being rendered |
+| `$config_id` | Int       | Configurator post ID |
+
+```php
+add_action( 'wp3dconf/frontend/toolbar/icons', function( $skin, $config_id ) {
+  echo '<span class="my-icon" role="button" tabindex="0" aria-label="' . esc_attr__( 'My tool', 'my-addon' ) . '">…</span>';
+}, 10, 2 );
+```
+
+---
 
 #### `wp3dconf/frontend/after_enqueue`
 
@@ -492,7 +557,30 @@ Make the same change in JS with `wp3dconf/frontend/price/layer_amounts`.
 
 ---
 
+---
+
 ## Skins
+
+#### `wp3dconf/skin/settings_schema`
+
+*Since 1.4.0.* Filters the settings every skin accepts. Each one becomes a shortcode attribute and a block and page builder control. A module adds its own here; the Inspiration Gallery adds `show_inspiration`. Read the value in a hook that receives the skin with `$skin->get_setting( 'my_setting' )`.
+
+| Parameter | Type  | Description |
+|-----------|-------|-------------|
+| `$schema` | Array | Setting name => `type` (toggle, select, number, text), `label`, `default`, and `options` for a select |
+
+```php
+add_filter( 'wp3dconf/skin/settings_schema', function( $schema ) {
+  $schema['show_my_feature'] = array(
+    'type'    => 'toggle',
+    'label'   => __( 'Show my feature', 'my-addon' ),
+    'default' => true,
+  );
+  return $schema;
+} );
+```
+
+---
 
 #### `wp3dconf/register_skins`
 

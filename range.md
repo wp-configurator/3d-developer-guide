@@ -2,8 +2,8 @@
 
 **Audience:** developers extending or integrating the Range layer: themes and add-on plugins.
 **Not for:** shop owners (see the Range user guide on docs-3d.wpconfigurator.com).
-**Applies to:** plugin v1.3.5
-**Last updated:** 2026-10-29
+**Applies to:** plugin v1.4.0
+**Last updated:** 2026-11-12
 
 Read [extend-modules.md](extend-modules.md) first for the general module contract, and
 [custom-fields.md](custom-fields.md) for the module the Range belongs to. This guide covers only what is
@@ -45,18 +45,22 @@ so it always appears in the summary and the cart. It has no Required setting.
 ```
 modules/custom-fields/
 ├── class-custom-fields.php   # Module_Base subclass: layer types, settings, payloads, pricing + summary filters
-├── class-fields.php          # Fields: type table, settings schema, and the Range helpers (normalise, price, tiers)
+├── class-field-base.php      # Field_Base: the contract every field type implements
+├── class-fields.php          # Fields: registry, shared settings schema, rendering
+├── fields/
+│   └── class-field-range.php # Field_Range: value, template args, price, summary, and the scale math
 └── assets/frontend/
-    ├── custom-fields.js      # hand-authored runtime, no build step
+    ├── js/type-range.js      # the Range handler and its scale math, mirroring Field_Range
+    ├── js/*.js               # the rest of the runtime, unbundled script modules
     └── custom-fields.css     # .wp3dconf-range* rules
 templates/layer/
 ├── layer-field.php           # shared wrapper: label, description, live price
 └── layer-range.php           # the slider and/or number box
 ```
 
-**There is no Vite build for the frontend runtime.** `custom-fields.js` is served as written;
-`Module_Base` falls back to `<slug>.js` when no `<slug>.min.js` exists. The editor controls (the Range
-preview and the Price Tiers repeater) are part of the core editor bundle, not of the module.
+**There is no Vite build for the frontend runtime.** The files in `assets/frontend/js/` are served as
+written, as script modules listed in `Custom_Fields::frontend_script_modules()`. The editor controls
+(the Range preview and the Price Tiers repeater) are part of the core editor bundle, not of the module.
 
 ---
 
@@ -124,8 +128,8 @@ price.
 
 ### 4.1 How the Range plugs into `Module_Base`
 
-The Range has no class of its own. `Custom_Fields` registers it alongside the other field types, through
-the standard overrides:
+The Range is `Field_Range`, a `Field_Base` subclass that `Custom_Fields` registers alongside the other
+field types. The module reaches `Module_Base` through the standard overrides:
 
 | Method | What it does for the Range |
 |---|---|
@@ -136,10 +140,10 @@ the standard overrides:
 | `editor_payload( $post_id )` | Becomes `window.editorData.customFields`, with the preview and tier strings |
 | `init()` | Hooks the render action, the pricing and summary filters, and the kses allowance |
 
-**Adding a similar layer type.** `Fields::get_types()` has no filter, so an add-on can't add a field type
-to Custom Fields. Build your own module with `layer_type()` instead, following
-[extend-modules.md](extend-modules.md). To give it the same scale and pricing as a Range, call the public
-`Fields` helpers (section 5) from your own pricing filters rather than reimplementing them.
+**Adding a similar layer type.** Extend `Field_Range`, or write a `Field_Base` subclass that declares
+the `numeric` capability, and register it with `Fields::register()`; see "Adding a field type" in
+[custom-fields.md](custom-fields.md). A `numeric` type gets the Range settings and, with no frontend
+handler of its own, the Range handler.
 
 ### 4.2 PHP hooks this module uses (and you can also use)
 

@@ -2,7 +2,7 @@
 
 **Audience:** developers and theme authors building a custom frontend skin.
 **Not for:** shop owners (plugin settings) or 3D artists.
-**Applies to:** plugin v1.3.7
+**Applies to:** plugin v1.4.0
 **Last updated:** 2026-11-05
 
 Skins control how the configurator is rendered on the frontend — the layout, the controls structure, the canvas placement, and any surrounding UI. The plugin ships with two built-in skins (`default` and `accordion`). You can create your own by extending `Skin_Base` and registering it via the `wp3dconf/register_skins` hook.
@@ -351,7 +351,7 @@ public static function get_settings_schema() {
 
 Read a value inside the skin with `$this->get_setting( 'my_skin_open_first' )`. A `select` also needs an `options` array of value => label.
 
-`Skin_Base` already declares four toggles: `show_toolbar`, `show_total_price`, `show_summary` and `show_form`. They apply when the skin's template prints those sections with `get_toolbar_html()`, `get_total_price_html()`, `get_summary_html()` and `get_form_html()`. A template that prints them another way ignores the toggles.
+`Skin_Base` already declares four toggles: `show_toolbar`, `show_total_price`, `show_summary` and `show_form`. They apply when the skin's template prints those sections with `get_toolbar_html()`, `get_total_price_html()`, `get_summary_html()` and `get_form_html()`. A template that prints them another way ignores the toggles. Modules can add their own through the `wp3dconf/skin/settings_schema` filter; the Inspiration Gallery adds `show_inspiration`, which applies wherever the template prints `get_canvas_html()`.
 
 Keep in mind:
 

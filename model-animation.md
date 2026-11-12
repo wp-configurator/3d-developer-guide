@@ -23,7 +23,7 @@ It's a self-contained module built on the `Module_Base` contract described in [`
 | PHP bootstrap, sanitization, payloads | `modules/morph-animation/class-morph-animation.php` |
 | Editor dialog (Vue) | `common/_dev/modules/morph-animation/` → built to `modules/morph-animation/assets/editor/` |
 | Shared movement editor + math | `common/_dev/src/components/Morph/MorphTracksEditor.vue`, `src/utils/morph.ts`, `src/utils/morphEvaluate.ts`, `src/stores/morphTriggers.ts` |
-| Frontend runtime | `common/_dev/modules/morph-animation/frontend/` → built to `modules/morph-animation/assets/frontend/morph-animation.min.js` |
+| Frontend runtime | `modules/morph-animation/assets/frontend/js/` — hand-written ES modules, not bundled |
 | Dropdown styling | `modules/morph-animation/assets/frontend/morph-animation.css` |
 
 ---
@@ -179,13 +179,15 @@ The strings live in the module rather than the editor's own i18n so Lite never c
 | `wp3dconf/editor/save_configurator` (20) | `normalize_saved_settings()` |
 | `wp3dconf/frontend/canvas/after_canvas` | `render_trigger_dropdown()` prints the dropdown markup |
 
-Markup contract: the bundle binds to `[data-wp3dconf-morph-trigger]`; option values (`data-value`) are the animation ids. Classes are `wp3dconf-morph-trigger*` — style them in your theme if needed.
+Markup contract: the dropdown is an Alpine component (`x-data="wp3dconfMorphTrigger"`) on `[data-wp3dconf-morph-trigger]`, printed `hidden` with `x-ignore` and started by the script once it runs. Option values (`data-value`) are the animation ids; `data-value` on the root is the one showing on load. Classes are `wp3dconf-morph-trigger*` — style them in your theme if needed.
 
 ---
 
 ## Frontend Runtime
 
-`morph-animation.min.js` is an IIFE. It waits for `wp3dconf/frontend:ready` if the hook bus isn't there yet, then subscribes to:
+The frontend is not bundled, so a browser's devtools shows the real file and line when something breaks on a site. The files are native ES modules loaded with `wp_enqueue_script_module()`, listed with their imports in `Morph_Animation::frontend_script_modules()`; they import each other as `@wp3dconf/morph-animation/<name>`, which WordPress resolves through the page's import map. Add an `import` and that list has to change with it.
+
+`main.js` starts on `DOMContentLoaded` and subscribes to:
 
 | Host event | Used for |
 |---|---|
@@ -194,20 +196,21 @@ Markup contract: the bundle binds to `[data-wp3dconf-morph-trigger]`; option val
 | `wp3dconf/frontend/modelLoaded` | Bind the scene |
 | `wp3dconf/frontend/replacementModelLoaded` | Re-bind after a model swap |
 
-Internals (`common/_dev/modules/morph-animation/frontend/`):
+Files (`modules/morph-animation/assets/frontend/js/`):
 
-- `rules.ts` — pure functions `decideOpen`, `decideClose`, `decideOption` returning `activate` / `deactivate` / `none`. Easy to unit-test; keys are `trigger:<id>`.
-- `animator.ts` — `MorphAnimator`: per-key progress, `requestAnimationFrame` loop that only runs while something moves; writes morph influences only (the viewer already renders every frame).
-- `layers.ts` — `nearestAnimatedGroup()`, with a loop guard for malformed layer trees.
-- `dropdown.ts` — accessible listbox dropdown behaviour.
+- `evaluate.js` — reads a saved animation and turns progress into influences. A plain JS copy of the three.js-free parts of `src/utils/morph.ts` and `src/utils/morphEvaluate.ts`; `tests/frontend/morphEvaluateParity.test.ts` fails if the two drift apart.
+- `rules.js` — pure functions `decideOpen`, `decideClose`, `decideOption` returning `activate` / `deactivate` / `none`, plus `nearestAnimatedGroup()` with a loop guard for malformed layer trees. Keys are `trigger:<id>`.
+- `animator.js` — `MorphAnimator`: per-key progress, `requestAnimationFrame` loop that only runs while something moves; writes morph influences only (the viewer already renders every frame).
+- `dropdown.js` — the Alpine listbox component and `mountDropdown()`.
+- `main.js` — reads `window.WP3dConf.morphAnimation`, binds the scene and the hooks.
 
 ---
 
 ## Extending
 
-- **Add another easing:** add the name to `Morph_Animation::EASINGS` and handle it in `easeProgress()` in `src/utils/morphEvaluate.ts`; add its label to the editor `i18n` and select.
+- **Add another easing:** add the name to `Morph_Animation::EASINGS` and handle it in `easeProgress()` in both `src/utils/morphEvaluate.ts` and `assets/frontend/js/evaluate.js`; add its label to the editor `i18n` and select.
 - **Change limits:** `MAX_TRIGGERS` / `MAX_TRACKS` only bound the sanitizer; nothing else depends on them.
-- **Rebuilding:** after editing anything under `common/_dev/modules/morph-animation/` or the shared `src/` files it uses, run the module build (`composer build-assets` / `common/_dev/scripts/build-modules.mjs`). The editor also needs rebuilding if the host stores (`use3DStore`, `useMorphTriggersStore`) change, since the module bundle receives them via `window.wp3dConf`.
+- **Rebuilding:** the frontend needs no build — edit the files in `assets/frontend/js/` and reload. After editing the editor side, anything under `common/_dev/modules/morph-animation/` or the shared `src/` files it uses, run the module build (`composer build-assets` / `common/_dev/scripts/build-modules.mjs`). The editor also needs rebuilding if the host stores (`use3DStore`, `useMorphTriggersStore`) change, since the module bundle receives them via `window.wp3dConf`.
 - **Changing the saved shape:** there is no schema version on this data. Old configurators must keep loading, so add defensive defaults in `normalize()` / `normalize_triggers()` rather than changing field meanings.
 
 ---

@@ -2,7 +2,7 @@
 
 **Audience:** site owners placing a configurator on a page or post.
 **Not for:** building the configurator in the editor, or developers adding skins and page builders.
-**Applies to:** plugin v1.3.7
+**Applies to:** plugin v1.4.0
 **Last updated:** 2026-11-05
 
 A configurator can be placed on any page or post with a shortcode, a block, or an element in a supported page builder. All of them do the same thing underneath: they ask the plugin to render one configurator with one skin.
@@ -36,6 +36,7 @@ The built-in skins accept these on top of `id` and `skin`:
 | `show_total_price` | `yes` |
 | `show_summary` | `yes` |
 | `show_form` | `yes` |
+| `show_inspiration` | `yes` — Pro, with the Inspiration Gallery module enabled |
 
 Use `yes`/`no`, `on`/`off`, `true`/`false` or `1`/`0`:
 
