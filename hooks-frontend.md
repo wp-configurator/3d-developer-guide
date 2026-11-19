@@ -241,7 +241,7 @@ addAction('wp3dconf/frontend/canvas/apply', function({ uid, layer, targetMeshes,
 
 #### `wp3dconf/frontend/configuration/applied`
 
-*Since 1.4.0.* Fires once after `store.applyConfiguration()` has replaced the whole selection, for example when a visitor applies an [inspiration](inspiration-gallery.md) or undoes one. Each layer that left or arrived has already fired `layer/deactivated` or `layer/activated`.
+*Since 1.4.0.* Fires once after `store.applyConfiguration()` has replaced the whole selection, for example when a visitor applies an [inspiration](inspiration-gallery-developer-guide.md) or undoes one. Each layer that left or arrived has already fired `layer/deactivated` or `layer/activated`.
 
 | Parameter       | Type   | Description |
 |-----------------|--------|-------------|
